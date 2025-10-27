@@ -219,8 +219,9 @@ a {
 
 .info-table table td {
   border: 2px solid;
-  padding: 10px 10px;
+  padding: 15px 12px;
   font-weight: 500;
+  vertical-align: top;
 }
 
 .info-table table tr td input {
@@ -711,6 +712,22 @@ th {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.phone-input-group .custom-dropdown {
+  flex-shrink: 0;
+  min-width: 95px;
+}
+
+.phone-input-group .form-select {
+  width: 95px;
+  min-width: 95px;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background-color: #F8F2E5;
+  text-align: center;
+  font-weight: 600;
 }
 
 .phone-input-group select {

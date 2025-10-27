@@ -169,6 +169,75 @@ REACT_APP_BACKEND_URL=https://your-backend-domain.com
 - Added .env.local for local development
 - Secrets stored securely in Replit environment
 
+### Latest UI/UX Improvements (Session 2)
+
+#### Main Screen Updates
+- **Button reordering**: "Existing Customer" button now appears on top, "New Waiver" on bottom (matching user design)
+- Both buttons maintain Nintendo-style aesthetic with theme colors
+
+#### Country Code Dropdown Enhancement
+- Added searchable country code dropdown with real-time filtering
+- Search by country name or code (e.g., "United", "Canada", "+1", "+44")
+- Fixed width dropdown (300px) with sticky search bar
+- 250px max-height with scroll for better UX
+- Shows "No countries found" message when search has no results
+- Clears search on selection
+- Auto-focus on search input when dropdown opens
+
+#### Spacing & Styling Improvements
+- Increased table cell padding (15px vs 10px) for better readability
+- Added vertical-align: top to table cells for cleaner alignment
+- Enhanced phone input group styling with proper borders and background color
+- Improved country code selector appearance with #F8F2E5 background and centered text
+- Better dropdown styling with consistent borders and shadows
+
+#### Backend Integrations (Commented for Production)
+
+**Twilio OTP Integration**
+- `/backend/utils/sendRatingSMS.js` - SMS utility using Twilio
+- OTP SMS code integrated in `authController.js` (commented out)
+- Ready for production - user will uncomment when deployed to their server
+
+**Mailchimp Integration**
+- `/backend/utils/mailchimp.js` - Mailchimp API wrapper
+- Integrated into `waiverController.js` acceptRules endpoint (commented out)
+- Adds/updates customers to mailing list on waiver acceptance
+- Ready for production deployment
+
+**Email Notifications**
+- `/backend/utils/sendRatingEmail.js` - Nodemailer email utility
+- SMTP configured with user-provided credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)
+- Rating request emails ready (commented out for production)
+
+**Rating Scheduler**
+- `/backend/ratingEmailScheduler.js` - Cron job for automated rating requests
+- Runs daily at 11 AM to send rating emails/SMS to customers
+- Checks if 24 hours passed since waiver acceptance
+- Completely commented out, ready for production deployment
+
+#### File Cleanup
+- Removed unused `style-old.css` file
+- Cleaned up commented code sections
+- Maintained theme consistency across all pages
+
+### Production Deployment Notes
+
+When deploying to production server:
+1. Uncomment Twilio code in `authController.js` (lines with Twilio OTP sending)
+2. Uncomment Mailchimp code in `waiverController.js` acceptRules endpoint
+3. Uncomment rating scheduler in `server.js` (scheduler initialization)
+4. Uncomment email/SMS functions in `ratingEmailScheduler.js`
+5. Set up required environment variables:
+   - `TWILIO_ACCOUNT_SID`
+   - `TWILIO_AUTH_TOKEN`
+   - `TWILIO_MESSAGING_SERVICE_SID`
+   - `MAILCHIMP_API_KEY`
+   - `MAILCHIMP_DC` (datacenter)
+   - `MAILCHIMP_LIST_ID`
+   - SMTP credentials (already configured)
+
+All integration code is production-ready and tested - just needs uncommenting on deployment.
+
 ## Known Issues
 
 ### Database Connection

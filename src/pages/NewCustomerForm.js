@@ -23,6 +23,7 @@ function NewCustomerForm() {
   const stripMask = (val) => (val ? val.replace(/\D/g, "") : ""); // remove formatting
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
 
   // Add this function to handle country selection
   const handleCountrySelect = (code) => {
@@ -31,7 +32,14 @@ function NewCustomerForm() {
       country_code: code,
     }));
     setIsDropdownOpen(false);
+    setCountrySearch("");
   };
+
+  // Filter countries based on search
+  const filteredCountryCodes = countryCodes.filter((country) =>
+    country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+    country.code.includes(countrySearch)
+  );
 
   const [formData, setFormData] = useState({
     first_name: "",
@@ -275,21 +283,39 @@ function NewCustomerForm() {
                                 className="dropdown-menu show"
                                 style={{
                                   position: 'absolute',                              
-                                  maxHeight: '200px',
+                                  maxHeight: '250px',
                                   overflowY: 'auto',
                                   zIndex: 1000,
+                                  width: '300px'
                                 }}
                               >
-                                {countryCodes.map((c, index) => (
-                                  <div
-                                    key={index}
-                                    className="dropdown-item"
-                                    onClick={() => handleCountrySelect(c.code)}
-                                    style={{ cursor: 'pointer' }}
-                                  >
-                                    {c.code} - {c.name}
+                                <div style={{ position: 'sticky', top: 0, background: 'white', padding: '8px', borderBottom: '1px solid #ddd' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Search country or code..."
+                                    value={countrySearch}
+                                    onChange={(e) => setCountrySearch(e.target.value)}
+                                    className="form-control form-control-sm"
+                                    onClick={(e) => e.stopPropagation()}
+                                    autoFocus
+                                  />
+                                </div>
+                                {filteredCountryCodes.length > 0 ? (
+                                  filteredCountryCodes.map((c, index) => (
+                                    <div
+                                      key={index}
+                                      className="dropdown-item"
+                                      onClick={() => handleCountrySelect(c.code)}
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      {c.code} - {c.name}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="dropdown-item" style={{ color: '#999' }}>
+                                    No countries found
                                   </div>
-                                ))}
+                                )}
                               </div>
                             )}
                           </div>

@@ -42,16 +42,16 @@ export default function Index() {
 
             <div className="d-flex justify-content-center align-items-center gap-4 flex-column mt-4">
               <button
+                className="btn existing-customer"
+                onClick={() => handleStart("existing")}
+              >
+                Existing Customer
+              </button>
+              <button
                 className="btn new-waiver"
                 onClick={() => handleStart("new")}
               >
                 New Waiver
-              </button>
-              <button
-                className="btn existing-customer"
-                onClick={() => handleStart("existing")}
-              >
-                View My Waivers
               </button>
             </div>
           </div>

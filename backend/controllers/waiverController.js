@@ -1,4 +1,5 @@
 const db = require('../config/database');
+// const addToMailchimp = require('../utils/mailchimp');
 
 const createWaiver = async (req, res) => {
   const connection = await db.getConnection();
@@ -226,6 +227,27 @@ const acceptRules = async (req, res) => {
         [waivers[0].id]
       );
     }
+
+    // MAILCHIMP INTEGRATION - Uncomment when credentials are added
+    // Get customer info for Mailchimp
+    // const [customers] = await db.query('SELECT * FROM customers WHERE id = ?', [userId]);
+    // if (customers.length > 0) {
+    //   const customer = customers[0];
+    //   try {
+    //     await addToMailchimp(
+    //       customer.email,
+    //       customer.cell_phone,
+    //       customer.first_name,
+    //       customer.last_name,
+    //       customer.dob,
+    //       customer.city,
+    //       customer.address
+    //     );
+    //     console.log('✅ Customer added to Mailchimp');
+    //   } catch (mailchimpError) {
+    //     console.error('⚠️ Mailchimp error:', mailchimpError.message);
+    //   }
+    // }
 
     res.json({ success: true, message: 'Rules accepted successfully' });
   } catch (error) {

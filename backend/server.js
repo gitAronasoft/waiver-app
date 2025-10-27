@@ -9,6 +9,9 @@ const authRoutes = require('./routes/authRoutes');
 const staffRoutes = require('./routes/staffRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 
+// Rating Email/SMS Scheduler - Uncomment when credentials are ready
+// require('./ratingEmailScheduler');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
