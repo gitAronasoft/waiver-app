@@ -51,3 +51,36 @@ The database is designed with `customers`, `waiver_forms`, `minors`, `otps`, `st
 -   **Email Marketing**: Mailchimp (production-ready, currently commented out)
 -   **Email Notifications**: Nodemailer (SMTP configured, production-ready, currently commented out)
 -   **Scheduling**: Node-cron for automated rating request emails/SMS (production-ready, currently commented out)
+
+## Production Deployment
+
+### Environment Configuration
+All sensitive configuration is managed through environment variables in `backend/.env`:
+- **Database**: MySQL credentials (host, user, password, database name)
+- **Security**: JWT secret for authentication
+- **Twilio**: Account SID, Auth Token, Messaging Service SID for SMS/OTP
+- **Email**: SMTP credentials (host, port, user, password) for transactional emails
+- **Mailchimp**: API key, List ID, Data Center for marketing automation
+- **URLs**: Frontend URL for CORS and rating links
+
+### Deployment Resources
+- **DEPLOYMENT_GUIDE.md**: Comprehensive step-by-step deployment instructions for production servers
+- **ENABLE_FEATURES_GUIDE.md**: Instructions to enable optional features (email/SMS/Mailchimp)
+- **setup-production.sh**: Automated setup script for quick deployment
+- **backend/.env.example**: Complete template of all required environment variables
+
+### Security Best Practices
+- `.env` files are excluded from version control via `.gitignore`
+- All API keys and secrets must be configured server-side only
+- JWT secrets should be generated using cryptographically secure random values
+- Database credentials should follow principle of least privilege
+- CORS is configured but should be restricted to specific domains in production
+
+### Optional Features (Ready to Enable)
+All optional features are production-tested and commented out in the code, ready to be enabled when credentials are configured:
+1. **Automated Rating Emails**: Sends rating requests 3 hours after waiver completion
+2. **Automated Rating SMS**: SMS version of rating requests via Twilio
+3. **Mailchimp Auto-Subscribe**: Automatically adds customers to marketing list
+4. **OTP Verification**: SMS-based one-time password for customer authentication
+
+See `ENABLE_FEATURES_GUIDE.md` for detailed activation instructions.

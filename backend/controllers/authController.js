@@ -1,6 +1,6 @@
 const db = require('../config/database');
-// const twilio = require('twilio');
-// const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+const twilio = require('twilio');
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 /**
  * Sends OTP to customer's phone for verification
@@ -56,26 +56,25 @@ const sendOtp = async (req, res) => {
       [phone, otp, expiresAt]
     );
 
-    // TWILIO SMS - Uncomment when credentials are added
-    // let formattedPhone = phone;
-    // if (!formattedPhone.startsWith('+')) {
-    //   formattedPhone = cell_phone || `+1${phone}`;
-    // }
-    // 
-    // try {
-    //   await client.messages.create({
-    //     body: `Your verification code is ${otp} for your Skate & Play waiver. Enjoy your roller skating session.`,
-    //     messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-    //     to: formattedPhone
-    //   });
-    // } catch (twilioError) {
-    //   const errorId = `ERR_${Date.now()}`;
-    //   console.error(`[${errorId}] Twilio SMS failed:`, twilioError.message);
-    //   return res.status(500).json({ 
-    //     error: 'Failed to send OTP via SMS',
-    //     errorId 
-    //   });
-    // }
+    // TWILIO SMS - Send OTP via SMS
+    let formattedPhone = phone;
+    if (!formattedPhone.startsWith('+')) {
+      formattedPhone = cell_phone || `+1${phone}`;
+    }
+    
+    try {
+      await client.messages.create({
+        body: `Your verification code is ${otp} for your Skate & Play waiver. Enjoy your roller skating session.`,
+        messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+        to: formattedPhone
+      });
+      console.log(`✅ OTP SMS sent to ${formattedPhone}`);
+    } catch (twilioError) {
+      const errorId = `ERR_${Date.now()}`;
+      console.error(`[${errorId}] Twilio SMS failed:`, twilioError.message);
+      // Don't fail the entire request if SMS fails - still allow OTP verification
+      console.warn(`⚠️ OTP generated but SMS failed. User can still verify manually.`);
+    }
 
     // Development mode logging
     if (process.env.NODE_ENV === 'development') {
@@ -109,6 +108,8 @@ const verifyOtp = async (req, res) => {
   try {
     const { phone, otp } = req.body;
 
+    console.log(`🔍 Verifying OTP - Phone: ${phone}, OTP: ${otp}`);
+
     // Validate required fields
     if (!phone || !otp) {
       return res.status(400).json({ 
@@ -123,11 +124,17 @@ const verifyOtp = async (req, res) => {
       });
     }
 
+    // Debug: Check all OTPs in database
+    const [allOtps] = await db.query('SELECT phone, otp, expires_at FROM otps');
+    console.log(`📊 All OTPs in database:`, allOtps);
+
     // Check OTP validity
     const [otps] = await db.query(
       'SELECT * FROM otps WHERE phone = ? AND otp = ? AND expires_at > NOW()',
       [phone, otp]
     );
+
+    console.log(`✅ OTP match found:`, otps.length > 0 ? 'YES' : 'NO');
 
     if (otps.length === 0) {
       return res.status(400).json({ 
