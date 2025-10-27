@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
-import axios from "axios";
+import axios from "../../utils/axios";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Header from "./components/header";
@@ -186,6 +186,8 @@ function formatPhone(phone = "") {
 
 
   if (isLoading) return <div className="text-center mt-5">Loading...</div>;
+  
+  if (!customer) return <div className="text-center mt-5">Customer not found</div>;
 
   return (
     <>

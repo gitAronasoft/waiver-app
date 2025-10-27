@@ -9,8 +9,11 @@ router.post('/save-signature', waiverController.saveSignature);
 router.post('/accept-rules', waiverController.acceptRules);
 router.get('/getminors', waiverController.getMinors);
 router.get('/getAllCustomers', waiverController.getAllCustomers);
+router.get('/getallwaivers', waiverController.getAllWaivers);
 router.post('/verify/:id', waiverController.verifyWaiver);
 router.get('/waiver-details/:id', waiverController.getWaiverDetails);
 router.get('/user-history/:phone', waiverController.getUserHistory);
+router.delete('/:id', waiverController.deleteWaiver);
+router.put('/:id/status', waiverController.updateWaiverStatus);
 
 module.exports = router;

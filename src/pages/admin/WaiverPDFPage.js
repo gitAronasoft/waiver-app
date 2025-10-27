@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import axios from "axios";
+import axios from "../../utils/axios";
 import { BACKEND_URL } from '../../config';
 
 

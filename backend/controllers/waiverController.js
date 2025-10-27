@@ -784,7 +784,7 @@ const getWaiverDetails = async (req, res) => {
         wf.rules_accepted,
         wf.verified_by_staff
       FROM waiver_forms wf
-      JOIN customers c ON wf.user_id = c.id
+      JOIN customers c ON wf.customer_id = c.id
       WHERE wf.id = ?
     `,
       [id],
@@ -857,7 +857,7 @@ const getUserHistory = async (req, res) => {
           wf.completed,
           wf.created_at
         FROM waiver_forms wf
-        WHERE wf.user_id = ?
+        WHERE wf.customer_id = ?
         ORDER BY wf.created_at DESC
       `,
         [customerId],
@@ -892,6 +892,132 @@ const getUserHistory = async (req, res) => {
   }
 };
 
+/**
+ * Get all waivers with customer and minor details for admin history page
+ * Returns formatted data with minors grouped by waiver
+ */
+const getAllWaivers = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+        c.id AS customer_id,
+        c.first_name, 
+        c.last_name, 
+        c.cell_phone, 
+        w.id AS waiver_id, 
+        w.rating_email_sent,
+        w.rating_sms_sent,
+        DATE_FORMAT(w.signed_at, '%b %d, %Y at %h:%i %p') AS signed_at, 
+        w.verified_by_staff AS status,
+        GROUP_CONCAT(
+          CONCAT(m.first_name, '::', m.last_name) 
+          SEPARATOR '||'
+        ) AS minors
+      FROM customers c
+      JOIN waiver_forms w ON w.customer_id = c.id
+      LEFT JOIN minors m ON m.customer_id = c.id AND m.status = 1
+      GROUP BY w.id
+      ORDER BY w.signed_at DESC
+    `);
+
+    // Parse minors into array
+    const waivers = rows.map(r => ({
+      ...r,
+      id: r.customer_id,
+      minors: r.minors 
+        ? r.minors.split('||').map(n => {
+            const [first_name, last_name] = n.split('::');
+            return { first_name, last_name };
+          })
+        : []
+    }));
+
+    res.json(waivers);
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching all waivers:`, {
+      message: error.message,
+      stack: error.stack,
+    });
+
+    res.status(500).json({
+      error: "Failed to fetch waivers",
+      errorId,
+    });
+  }
+};
+
+/**
+ * Delete a waiver by ID
+ */
+const deleteWaiver = async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ error: "Waiver ID is required" });
+  }
+
+  try {
+    const [result] = await db.query('DELETE FROM waiver_forms WHERE id = ?', [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Waiver not found" });
+    }
+
+    console.log(`✅ Waiver deleted successfully: ID ${id}`);
+    res.json({ message: 'Waiver deleted successfully' });
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error deleting waiver:`, {
+      message: error.message,
+      waiverId: id,
+    });
+
+    res.status(500).json({
+      error: "Failed to delete waiver",
+      errorId,
+    });
+  }
+};
+
+/**
+ * Update waiver status (confirm/unconfirm)
+ */
+const updateWaiverStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (![0, 1].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status value. Must be 0 or 1.' });
+  }
+
+  try {
+    const [result] = await db.query(
+      'UPDATE waiver_forms SET verified_by_staff = ? WHERE id = ?',
+      [status, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Waiver not found" });
+    }
+
+    console.log(`✅ Waiver status updated: ID ${id}, Status ${status}`);
+    res.json({ message: 'Waiver status updated successfully' });
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error updating waiver status:`, {
+      message: error.message,
+      waiverId: id,
+      status,
+    });
+
+    res.status(500).json({
+      error: "Failed to update waiver status",
+      errorId,
+    });
+  }
+};
+
 module.exports = {
   createWaiver,
   getCustomerInfo,
@@ -903,4 +1029,7 @@ module.exports = {
   verifyWaiver,
   getWaiverDetails,
   getUserHistory,
+  getAllWaivers,
+  deleteWaiver,
+  updateWaiverStatus,
 };

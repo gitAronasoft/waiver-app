@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import axios from "../../utils/axios";
 import { toast } from "react-toastify";
 import { useParams, useNavigate } from "react-router-dom";
 import Header from "./components/header";
@@ -59,7 +59,7 @@ function UpdateStaff() {
 
     setSubmitting(true);
     try {
-      const res = await axios.put(`${BACKEND_URL}/api/staff/updatestaff/${id}`, form);
+      const res = await axios.put(`${BACKEND_URL}/api/staff/update-staff/${id}`, form);
       toast.success(res.data.message || "Staff updated successfully");
       navigate("/admin/staff-list");
     } catch (error) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import axios from 'axios';
+import axios from '../../utils/axios';
 import Header from './components/header';
 import { toast } from 'react-toastify';
 import { BACKEND_URL } from '../../config';
