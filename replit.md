@@ -6,6 +6,15 @@ This project is a full-stack waiver management system designed for Skate & Play.
 ## User Preferences
 I prefer simple language in explanations. I want iterative development, with frequent, small updates rather than large, infrequent ones. Please ask before making major changes or architectural decisions. Do not make changes to the `Backend-old` folder or any duplicate components.
 
+## Recent Changes (October 27, 2025)
+- **Signature Page Data Loading**: Fixed `getMinors` endpoint to return complete customer information (first_name, last_name, dob, address, etc.) along with minors, resolving issue where signature page showed blank fields after OTP verification.
+- **Minor Management Functionality**: Implemented complete add/update/delete operations for minors in `saveSignature` endpoint. The system now properly:
+  - Adds new minors to the database
+  - Updates existing minors when modified
+  - Deletes minors that are removed from the UI
+  - Honors check/uncheck status for each minor
+  - Ensures UI changes persist correctly across page reloads
+
 ## System Architecture
 
 ### UI/UX Decisions

@@ -51,10 +51,21 @@ function Signature() {
       setInitials(parsed.initials || "");
       setSignatureImage(parsed.signatureImage || null);
 
-      if (parsed.signatureImage && sigPadRef.current) {
-        setTimeout(() => {
-          sigPadRef.current.fromDataURL(parsed.signatureImage);
-        }, 300);
+      if (parsed.signatureImage) {
+        // Wait for component to fully mount and signature pad to be ready
+        const restoreSignature = () => {
+          if (sigPadRef.current) {
+            try {
+              sigPadRef.current.fromDataURL(parsed.signatureImage);
+            } catch (error) {
+              console.error("Failed to restore signature:", error);
+            }
+          }
+        };
+        
+        // Try multiple times with increasing delays to ensure pad is ready
+        setTimeout(restoreSignature, 100);
+        setTimeout(restoreSignature, 500);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

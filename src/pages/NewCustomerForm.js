@@ -200,9 +200,11 @@ function NewCustomerForm() {
 
     setIsSubmitting(true);
 
-    const phoneWithCode = `${formData.country_code}${stripMask(formData.cell_phone)}`;
+    const cleanPhone = stripMask(formData.cell_phone);
+    const phoneWithCode = `${formData.country_code}${cleanPhone}`;
     const fullData = {
       ...formData,
+      cell_phone: cleanPhone,
       cc_cell_phone: phoneWithCode,
       minors: minorList,
       send_otp: isChecked,

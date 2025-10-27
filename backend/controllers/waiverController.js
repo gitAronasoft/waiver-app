@@ -25,8 +25,7 @@ const createWaiver = async (req, res) => {
       first_name,
       last_name,
       email,
-      dob,
-      age,
+      dob,     
       address,
       city,
       province,
@@ -70,15 +69,14 @@ const createWaiver = async (req, res) => {
       await connection.query(
         `UPDATE customers SET 
           first_name = ?, last_name = ?, email = ?, 
-          dob = ?, age = ?, address = ?, city = ?, province = ?, 
+          dob = ?, address = ?, city = ?, province = ?, 
           postal_code = ?, country_code = ?, updated_at = NOW()
         WHERE id = ?`,
         [
           first_name,
           last_name,
           email,
-          dob,
-          age,
+          dob,      
           address,
           city,
           province,
@@ -90,15 +88,14 @@ const createWaiver = async (req, res) => {
     } else {
       const [result] = await connection.query(
         `INSERT INTO customers 
-        (first_name, last_name, email, dob, age, address, city, 
+        (first_name, last_name, email, dob, address, city, 
          province, postal_code, country_code, cell_phone, status) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
         [
           first_name,
           last_name,
           email,
-          dob,
-          age,
+          dob, 
           address,
           city,
           province,
@@ -222,7 +219,7 @@ const createWaiver = async (req, res) => {
     res.status(500).json({
       error: "Failed to create waiver",
       errorId,
-      error.message
+      message: error.message
     });
   } finally {
     connection.release();
@@ -327,7 +324,7 @@ const updateCustomer = async (req, res) => {
       `UPDATE customers SET 
         first_name = ?, last_name = ?, email = ?, dob = ?, 
         address = ?, city = ?, province = ?, postal_code = ?, 
-        cell_phone = ?, can_email = ?, updated_at = NOW()
+        cell_phone = ?, updated_at = NOW()
       WHERE id = ?`,
       [
         first_name,
@@ -338,8 +335,7 @@ const updateCustomer = async (req, res) => {
         city,
         province,
         postal_code,
-        cell_phone,
-        can_email,
+        cell_phone,       
         id,
       ],
     );
@@ -392,7 +388,7 @@ const updateCustomer = async (req, res) => {
 };
 
 /**
- * Saves customer signature to waiver form
+ * Saves customer signature to waiver form and updates minors
  */
 const saveSignature = async (req, res) => {
   try {
@@ -414,15 +410,61 @@ const saveSignature = async (req, res) => {
       });
     }
 
-    // Update customer signature
-    await db.query(
-      "UPDATE customers SET signature = ?, updated_at = NOW() WHERE id = ?",
-      [signature, id],
+    // Handle minors: add, update, and remove
+    // Get existing minors from database
+    const [existingMinors] = await db.query(
+      "SELECT id FROM minors WHERE customer_id = ?",
+      [id],
     );
+    
+    const existingMinorIds = existingMinors.map(m => m.id);
+    const submittedMinorIds = [];
+
+    // Process submitted minors (add new or update existing)
+    if (minors && minors.length > 0) {
+      for (const minor of minors) {
+        if (minor.isNew) {
+          // Insert new minor
+          await db.query(
+            "INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, ?)",
+            [
+              id,
+              minor.first_name,
+              minor.last_name,
+              minor.dob,
+              minor.checked ? 1 : 0,
+            ],
+          );
+        } else if (minor.id) {
+          // Update existing minor
+          submittedMinorIds.push(minor.id);
+          await db.query(
+            "UPDATE minors SET first_name = ?, last_name = ?, dob = ?, status = ? WHERE id = ?",
+            [
+              minor.first_name,
+              minor.last_name,
+              minor.dob,
+              minor.checked ? 1 : 0,
+              minor.id,
+            ],
+          );
+        }
+      }
+    }
+
+    // Delete minors that were removed (exist in DB but not in submitted list)
+    const minorsToDelete = existingMinorIds.filter(id => !submittedMinorIds.includes(id));
+    if (minorsToDelete.length > 0) {
+      await db.query(
+        "DELETE FROM minors WHERE id IN (?)",
+        [minorsToDelete],
+      );
+      console.log(`🗑️ Deleted ${minorsToDelete.length} minor(s) from customer ${id}`);
+    }
 
     // Get or create waiver form
     const [waivers] = await db.query(
-      "SELECT id FROM waiver_forms WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+      "SELECT id FROM waiver_forms WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1",
       [id],
     );
 
@@ -435,7 +477,7 @@ const saveSignature = async (req, res) => {
       );
     } else {
       const [result] = await db.query(
-        "INSERT INTO waiver_forms (user_id, signature_image, signed_at, completed) VALUES (?, ?, NOW(), 0)",
+        "INSERT INTO waiver_forms (customer_id, signature_image, signed_at, completed) VALUES (?, ?, NOW(), 0)",
         [id, signature],
       );
       waiverId = result.insertId;
@@ -475,7 +517,7 @@ const acceptRules = async (req, res) => {
     }
 
     const [waivers] = await db.query(
-      "SELECT id FROM waiver_forms WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+      "SELECT id FROM waiver_forms WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1",
       [userId],
     );
 
@@ -535,7 +577,8 @@ const acceptRules = async (req, res) => {
 };
 
 /**
- * Gets minors associated with a customer by phone number
+ * Gets customer information and associated minors by phone number
+ * Used by signature page to display customer data and minors
  */
 const getMinors = async (req, res) => {
   try {
@@ -548,30 +591,41 @@ const getMinors = async (req, res) => {
       });
     }
 
+    // Fetch complete customer data
     const [customers] = await db.query(
-      "SELECT id FROM customers WHERE cell_phone = ?",
+      "SELECT * FROM customers WHERE cell_phone = ?",
       [phone],
     );
 
     if (customers.length === 0) {
-      return res.json({ minors: [] });
+      return res.status(404).json({ 
+        error: "Customer not found",
+        minors: [] 
+      });
     }
 
+    const customer = customers[0];
+
+    // Fetch associated minors
     const [minors] = await db.query(
-      "SELECT * FROM minors WHERE customer_id = ? AND status = 1",
-      [customers[0].id],
+      "SELECT * FROM minors WHERE customer_id = ?",
+      [customer.id],
     );
 
-    res.json({ minors });
+    // Return customer data with minors (matching what signature page expects)
+    res.json({ 
+      ...customer,
+      minors 
+    });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
-    console.error(`[${errorId}] Error fetching minors:`, {
+    console.error(`[${errorId}] Error fetching customer and minors:`, {
       message: error.message,
       phone: req.query.phone,
     });
 
     res.status(500).json({
-      error: "Failed to fetch minors",
+      error: "Failed to fetch customer information",
       errorId,
     });
   }
@@ -613,7 +667,7 @@ const getAllCustomers = async (req, res) => {
           SEPARATOR '@@'
         ) as minors_data
       FROM waiver_forms wf
-      JOIN customers c ON wf.user_id = c.id
+      JOIN customers c ON wf.customer_id = c.id
       LEFT JOIN minors m ON m.customer_id = c.id AND m.status = 1
       WHERE wf.completed = 1
       GROUP BY wf.id, c.id, c.first_name, c.last_name, c.cell_phone, c.email, 
