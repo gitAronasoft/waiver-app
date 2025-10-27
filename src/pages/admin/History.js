@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import Header from './components/header';
 import Switch from "react-switch";
 import DataTable from 'react-data-table-component';
+import { BACKEND_URL } from '../../config';
 
 function HistoryPage() {
   const [waivers, setWaivers] = useState([]);
@@ -20,7 +21,6 @@ function HistoryPage() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const navigate = useNavigate();
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   // Detect mobile resize
   useEffect(() => {
@@ -42,7 +42,7 @@ function HistoryPage() {
         toast.error("Failed to load waivers.");
       })
       .finally(() => setLoading(false));
-  }, [BACKEND_URL]);
+  }, []);
 
   // Filter & search
   useEffect(() => {
@@ -248,7 +248,7 @@ const desktopColumns = [
     name: "Review Mail",
     cell: row => (
       <span className={`status-badge ${row.rating_email_sent === 1 ? 'confirmed' : 'unconfirmed'}`}>
-        {row.rating_email_sent == 1 ? "Mail Sent" : "Not Sent"}
+        {row.rating_email_sent === 1 ? "Mail Sent" : "Not Sent"}
       </span>
     ),
     sortable: true
@@ -258,7 +258,7 @@ const desktopColumns = [
     name: "Review SMS",
     cell: row => (
       <span className={`status-badge ${row.rating_sms_sent === 1 ? 'confirmed' : 'unconfirmed'}`}>
-        {row.rating_sms_sent == 1 ? "SMS Sent" : "Not Sent"}
+        {row.rating_sms_sent === 1 ? "SMS Sent" : "Not Sent"}
       </span>
     ),
     sortable: true

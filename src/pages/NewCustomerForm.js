@@ -1,29 +1,108 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useMask } from "@react-input/mask";
 import { countryCodes } from "../countryCodes";
+import { BACKEND_URL } from '../config';
 
 
 
 function NewCustomerForm() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const customerType = location.state?.customerType || "new";
   const [isChecked, setIsChecked] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+  const [errors, setErrors] = useState({});
 
   const cellPhoneRef = useMask({
     mask: "(___) ___-____",
     replacement: { _: /\d/ },
   });
 
-  const stripMask = (val) => (val ? val.replace(/\D/g, "") : ""); // remove formatting
+  const stripMask = (val) => (val ? val.replace(/\D/g, "") : "");
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.first_name.trim()) {
+      newErrors.first_name = "First name is required";
+    }
+
+    if (!formData.last_name.trim()) {
+      newErrors.last_name = "Last name is required";
+    }
+
+    if (!formData.dob) {
+      newErrors.dob = "Date of birth is required";
+    } else {
+      const dobDate = new Date(formData.dob);
+      const today = new Date();
+      if (dobDate > today) {
+        newErrors.dob = "Date of birth cannot be in the future";
+      }
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = "Please enter a valid email address (e.g., name@example.com)";
+    }
+
+    const phoneDigits = stripMask(formData.cell_phone);
+    if (!phoneDigits) {
+      newErrors.cell_phone = "Phone number is required";
+    } else if (phoneDigits.length !== 10) {
+      newErrors.cell_phone = "Phone number must be exactly 10 digits";
+    }
+
+    if (!formData.address.trim()) {
+      newErrors.address = "Address is required";
+    }
+
+    if (!formData.city.trim()) {
+      newErrors.city = "City is required";
+    }
+
+    if (!formData.province.trim()) {
+      newErrors.province = "Province is required";
+    }
+
+    if (!formData.postal_code.trim()) {
+      newErrors.postal_code = "Postal code is required";
+    }
+
+    if (formData.signing_for_minor && minorList.length > 0) {
+      minorList.forEach((minor, index) => {
+        if (!minor.first_name.trim()) {
+          newErrors[`minor_${index}_first_name`] = `Minor ${index + 1} first name is required`;
+        }
+        if (!minor.last_name.trim()) {
+          newErrors[`minor_${index}_last_name`] = `Minor ${index + 1} last name is required`;
+        }
+        if (!minor.dob) {
+          newErrors[`minor_${index}_dob`] = `Minor ${index + 1} date of birth is required`;
+        } else {
+          const minorDobDate = new Date(minor.dob);
+          const today = new Date();
+          if (minorDobDate > today) {
+            newErrors[`minor_${index}_dob`] = `Minor ${index + 1} date of birth cannot be in the future`;
+          }
+        }
+      });
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }; // remove formatting
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState("");
+  const dropdownRef = useRef(null);
 
   // Add this function to handle country selection
   const handleCountrySelect = (code) => {
@@ -40,6 +119,33 @@ function NewCustomerForm() {
     country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
     country.code.includes(countrySearch)
   );
+
+  // Handle click outside and Escape key
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+        setCountrySearch("");
+      }
+    };
+
+    const handleEscapeKey = (event) => {
+      if (event.key === "Escape") {
+        setIsDropdownOpen(false);
+        setCountrySearch("");
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscapeKey);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, [isDropdownOpen]);
 
   const [formData, setFormData] = useState({
     first_name: "",
@@ -84,9 +190,15 @@ function NewCustomerForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    // const fullData = { ...formData, minors: minorList, send_otp: isChecked };
 
+    if (!validateForm()) {
+      const firstErrorKey = Object.keys(errors)[0];
+      const firstErrorMessage = errors[firstErrorKey] || "Please correct the errors in the form";
+      toast.error(firstErrorMessage);
+      return;
+    }
+
+    setIsSubmitting(true);
 
     const phoneWithCode = `${formData.country_code}${stripMask(formData.cell_phone)}`;
     const fullData = {
@@ -111,10 +223,10 @@ function NewCustomerForm() {
       }
     } catch (err) {
       if (err.response && err.response.data?.error) {
-        toast.error(`❌ ${err.response.data.error}`);
+        toast.error(`${err.response.data.error}`);
       } else {
         console.error(err);
-        toast.error("❌ Error submitting form. Please try again.");
+        toast.error("Error submitting form. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -168,9 +280,9 @@ function NewCustomerForm() {
                           name="first_name"
                           value={formData.first_name}
                           onChange={handleChange}
-                          className="form-control"
-                          required
+                          className={`form-control ${errors.first_name ? 'is-invalid' : ''}`}
                         />
+                        {errors.first_name && <small className="text-danger">{errors.first_name}</small>}
                       </td>
                       <td>
                         Last Name:<span className="required-star">*</span>
@@ -180,9 +292,9 @@ function NewCustomerForm() {
                           name="last_name"
                           value={formData.last_name}
                           onChange={handleChange}
-                          className="form-control"
-                          required
+                          className={`form-control ${errors.last_name ? 'is-invalid' : ''}`}
                         />
+                        {errors.last_name && <small className="text-danger">{errors.last_name}</small>}
                       </td>
                       <td>
                         DOB:<span className="required-star">*</span>
@@ -192,9 +304,9 @@ function NewCustomerForm() {
                           name="dob"
                           value={formData.dob}
                           onChange={handleChange}
-                          className="form-control"
-                          required
+                          className={`form-control ${errors.dob ? 'is-invalid' : ''}`}
                         />
+                        {errors.dob && <small className="text-danger">{errors.dob}</small>}
                       </td>
                     </tr>
 
@@ -207,9 +319,9 @@ function NewCustomerForm() {
                           name="address"
                           value={formData.address}
                           onChange={handleChange}
-                          className="form-control"
-                          required
+                          className={`form-control ${errors.address ? 'is-invalid' : ''}`}
                         />
+                        {errors.address && <small className="text-danger">{errors.address}</small>}
                       </td>
                       <td>
                         City:<span className="required-star">*</span>
@@ -219,9 +331,9 @@ function NewCustomerForm() {
                           name="city"
                           value={formData.city}
                           onChange={handleChange}
-                          className="form-control"
-                          required
+                          className={`form-control ${errors.city ? 'is-invalid' : ''}`}
                         />
+                        {errors.city && <small className="text-danger">{errors.city}</small>}
                       </td>
                       <td>
                         Province:<span className="required-star">*</span>
@@ -231,9 +343,9 @@ function NewCustomerForm() {
                           name="province"
                           value={formData.province}
                           onChange={handleChange}
-                          className="form-control"
-                          required
+                          className={`form-control ${errors.province ? 'is-invalid' : ''}`}
                         />
+                        {errors.province && <small className="text-danger">{errors.province}</small>}
                       </td>
                     
                     </tr>
@@ -248,9 +360,9 @@ function NewCustomerForm() {
                           name="postal_code"
                           value={formData.postal_code}
                           onChange={handleChange}
-                          className="form-control"
-                          required
+                          className={`form-control ${errors.postal_code ? 'is-invalid' : ''}`}
                         />
+                        {errors.postal_code && <small className="text-danger">{errors.postal_code}</small>}
                       </td>
                       {/* <td>
                         Cell Phone:<span className="required-star">*</span>
@@ -270,7 +382,7 @@ function NewCustomerForm() {
                         Cell Phone:<span className="required-star">*</span>
                         <br />
                         <div className="phone-input-group">
-                          <div className="custom-dropdown" style={{ position: 'relative' }}>
+                          <div className="custom-dropdown" style={{ position: 'relative' }} ref={dropdownRef}>
                             <div
                               className="form-select"
                               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -326,10 +438,10 @@ function NewCustomerForm() {
                             name="cell_phone"
                             value={formData.cell_phone}
                             onChange={handleChange}
-                            className="form-control"
-                            required
+                            className={`form-control ${errors.cell_phone ? 'is-invalid' : ''}`}
                           />
                         </div>
+                        {errors.cell_phone && <small className="text-danger">{errors.cell_phone}</small>}
                       </td>
 
                       <td >
@@ -340,9 +452,9 @@ function NewCustomerForm() {
                           name="email"
                           value={formData.email}
                           onChange={handleChange}
-                          className="form-control"
-                          required
+                          className={`form-control ${errors.email ? 'is-invalid' : ''}`}
                         />
+                        {errors.email && <small className="text-danger">{errors.email}</small>}
                       </td>
                     </tr>
                   </tbody>
@@ -389,40 +501,55 @@ function NewCustomerForm() {
               {formData.signing_for_minor && (
                 <>
                   {minorList.map((minor, index) => (
-                    <div key={index} className="minor-group d-flex gap-2 mb-3">
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="First Name"
-                        value={minor.first_name}
-                        onChange={(e) =>
-                          handleMinorChange(index, "first_name", e.target.value)
-                        }
-                      />
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Last Name"
-                        value={minor.last_name}
-                        onChange={(e) =>
-                          handleMinorChange(index, "last_name", e.target.value)
-                        }
-                      />
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={minor.dob}
-                        onChange={(e) =>
-                          handleMinorChange(index, "dob", e.target.value)
-                        }
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => removeMinor(index)}
-                      >
-                        Remove
-                      </button>
+                    <div key={index} className="mb-3">
+                      <div className="minor-group d-flex gap-2">
+                        <div className="flex-fill">
+                          <input
+                            type="text"
+                            className={`form-control ${errors[`minor_${index}_first_name`] ? 'is-invalid' : ''}`}
+                            placeholder="First Name"
+                            value={minor.first_name}
+                            onChange={(e) =>
+                              handleMinorChange(index, "first_name", e.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="flex-fill">
+                          <input
+                            type="text"
+                            className={`form-control ${errors[`minor_${index}_last_name`] ? 'is-invalid' : ''}`}
+                            placeholder="Last Name"
+                            value={minor.last_name}
+                            onChange={(e) =>
+                              handleMinorChange(index, "last_name", e.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="flex-fill">
+                          <input
+                            type="date"
+                            className={`form-control ${errors[`minor_${index}_dob`] ? 'is-invalid' : ''}`}
+                            value={minor.dob}
+                            onChange={(e) =>
+                              handleMinorChange(index, "dob", e.target.value)
+                            }
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={() => removeMinor(index)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      {(errors[`minor_${index}_first_name`] || errors[`minor_${index}_last_name`] || errors[`minor_${index}_dob`]) && (
+                        <div className="text-danger mt-1">
+                          {errors[`minor_${index}_first_name`] && <small className="d-block">{errors[`minor_${index}_first_name`]}</small>}
+                          {errors[`minor_${index}_last_name`] && <small className="d-block">{errors[`minor_${index}_last_name`]}</small>}
+                          {errors[`minor_${index}_dob`] && <small className="d-block">{errors[`minor_${index}_dob`]}</small>}
+                        </div>
+                      )}
                     </div>
                   ))}
                   <button

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
+import { BACKEND_URL } from '../../../config';
 
 function Header() {
   const location = useLocation();
@@ -7,9 +8,7 @@ function Header() {
   const currentPath = location.pathname;
 
   const staff = JSON.parse(localStorage.getItem("staff"));
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null); // Reference for dropdown
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -17,18 +16,6 @@ function Header() {
     navigate("/admin/login");
   };
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
 
   return (
     <div className="container-fluid container-header ">
@@ -85,7 +72,6 @@ function Header() {
                 alt="profile"
                 className="dropdown-toggle"
                 data-bs-toggle="dropdown"
-                aria-expanded="false"
                 style={{
                   width: "40px",
                   height: "40px",
@@ -185,7 +171,6 @@ function Header() {
                 alt="profile"
                 className="dropdown-toggle"
                 data-bs-toggle="dropdown"
-                aria-expanded="false"
                 style={{
                   width: "40px",
                   height: "40px",

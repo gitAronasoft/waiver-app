@@ -1,26 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import Header from './components/header';
 import { toast } from 'react-toastify';
+import { BACKEND_URL } from '../../config';
 
 function HomePage() {
   const [customers, setCustomers] = useState([]);
   const [selected, setSelected] = useState(null); // { customer, waiverId }
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
   const staff = JSON.parse(localStorage.getItem("staff")) || {};
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await axios.get(`${BACKEND_URL}/api/waivers/getAllCustomers`);
       setCustomers(res.data);
     } catch (err) {
       console.error('Error fetching customers:', err);
       toast.error('Failed to load waivers');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   const verifyWaiver = async (waiverId, verified_by_staff) => {
+    setVerifying(true);
     try {
       const res = await axios.post(`${BACKEND_URL}/api/waivers/verify/${waiverId}`, {
         staff_id: staff.id,
@@ -31,12 +37,14 @@ function HomePage() {
     } catch (err) {
       console.error('Error verifying waiver:', err);
       toast.error("Verification failed");
+    } finally {
+      setVerifying(false);
     }
   };
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const filteredCustomers = customers.filter((c) => {
     const fullName = `${c.first_name} ${c.last_name}`.toLowerCase();
@@ -67,15 +75,19 @@ function HomePage() {
 
         <div className="row">
           <div className="col-md-12 col-xl-12">
-            <div className="card-grid mb-5">
-              {filteredCustomers.map((c) => (
-                <PersonCard
-                  key={c.id}
-                  customer={c}
-                  onDetails={(waiverId) => setSelected({ customer: c, waiverId })}
-                />
-              ))}
-            </div>
+            {loading ? (
+              <p className="text-center">Loading waivers...</p>
+            ) : (
+              <div className="card-grid mb-5">
+                {filteredCustomers.map((c) => (
+                  <PersonCard
+                    key={c.id}
+                    customer={c}
+                    onDetails={(waiverId) => setSelected({ customer: c, waiverId })}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -88,6 +100,7 @@ function HomePage() {
               verifyWaiver(waiverId, verified_by_staff);
               setSelected(null);
             }}
+            verifying={verifying}
           />
         )}
       </div>
@@ -117,7 +130,7 @@ function PersonCard({ customer, onDetails }) {
   );
 }
 
-function DetailsModal({ customer, waiverId, onClose, onVerify }) {
+function DetailsModal({ customer, waiverId, onClose, onVerify, verifying }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [actionType, setActionType] = useState(null); // 'verify' or 'notAccurate'
 

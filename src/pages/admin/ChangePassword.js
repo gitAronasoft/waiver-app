@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import Header from "./components/header";
+import { BACKEND_URL } from '../../config';
 
 function ChangePassword() {
   const [form, setForm] = useState({
@@ -11,8 +12,6 @@ function ChangePassword() {
   });
 
   const [loading, setLoading] = useState(false);
-  const BACKEND_URL =
-    process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 
   const staff = JSON.parse(localStorage.getItem("staff")); // id & email from logged-in user
 
@@ -20,16 +19,53 @@ function ChangePassword() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const validatePassword = (password) => {
+    if (password.length < 8) {
+      return "Password must be at least 8 characters long";
+    }
+    if (!/[A-Z]/.test(password)) {
+      return "Password must contain at least one uppercase letter";
+    }
+    if (!/[a-z]/.test(password)) {
+      return "Password must contain at least one lowercase letter";
+    }
+    if (!/[0-9]/.test(password)) {
+      return "Password must contain at least one number";
+    }
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.currentPassword || !form.newPassword || !form.confirmPassword) {
-      toast.error("All fields are required");
+    if (!form.currentPassword.trim()) {
+      toast.error("Current password is required");
+      return;
+    }
+
+    if (!form.newPassword.trim()) {
+      toast.error("New password is required");
+      return;
+    }
+
+    if (!form.confirmPassword.trim()) {
+      toast.error("Confirm password is required");
+      return;
+    }
+
+    const passwordError = validatePassword(form.newPassword);
+    if (passwordError) {
+      toast.error(passwordError);
       return;
     }
 
     if (form.newPassword !== form.confirmPassword) {
       toast.error("New password and confirm password do not match");
+      return;
+    }
+
+    if (form.currentPassword === form.newPassword) {
+      toast.error("New password must be different from current password");
       return;
     }
 

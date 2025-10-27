@@ -2,26 +2,22 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate , Link} from "react-router-dom";
 import axios from "axios";
 import { toast } from 'react-toastify';
-import { useMask } from "@react-input/mask"; // ✅ Import mask
+import { BACKEND_URL } from '../config';
 
 function ConfirmCustomerInfo() {
   const location = useLocation();
   const navigate = useNavigate();
   const phone = location.state?.phone;
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-
-  const customerType = location.state?.customerType || "existing";
 
   const [formData, setFormData] = useState(null);
   const [minorList, setMinorList] = useState([]);
-   // ✅ Phone mask refs
-  const homePhoneRef = useMask({ mask: "(___) ___-____", replacement: { _: /\d/ } });
-  const cellPhoneRef = useMask({ mask: "(___) ___-____", replacement: { _: /\d/ } });
-  const workPhoneRef = useMask({ mask: "(___) ___-____", replacement: { _: /\d/ } });
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
 
 
   useEffect(() => {
     if (phone) {
+      setLoading(true);
       axios
         .get(`${BACKEND_URL}/api/waivers/customer-info?phone=${phone}`)
         .then((res) => {
@@ -58,11 +54,13 @@ function ConfirmCustomerInfo() {
         })
         .catch((err) => {
           console.error(err);
-          // alert("Failed to fetch customer info.");
-           toast.error(err?.response?.data?.message || "Failed to fetch customer info.");
+          toast.error(err?.response?.data?.message || "Failed to fetch customer info.");
+        })
+        .finally(() => {
+          setLoading(false);
         });
     }
-  }, [phone, BACKEND_URL]);
+  }, [phone]);
 
   // const handleChange = (e) => {
   //   const { name, value, type } = e.target;
@@ -90,6 +88,7 @@ function ConfirmCustomerInfo() {
   };
 
   const goToSignature = async () => {
+    setUpdating(true);
     try {
        const stripMask = (val) => (val ? val.replace(/\D/g, "") : ""); // ✅ remove formatting
       const updatedData = {
@@ -112,11 +111,12 @@ function ConfirmCustomerInfo() {
       navigate("/signature", { state: { phone, formData: updatedData } });
     } catch (err) {
       console.error("Error updating customer:", err);
-      // alert("Failed to update customer info.");
-        toast.error("Failed to update customer info.");
+      toast.error("Failed to update customer info.");
+    } finally {
+      setUpdating(false);
     }
   };
-  if (!formData) {
+  if (loading || !formData) {
     return <div className="text-center mt-5">Loading customer info...</div>;
   }
 
@@ -303,8 +303,8 @@ function ConfirmCustomerInfo() {
                     Add another minor
                   </button>
                   <span className="or-text mx-2">or</span>
-                  <button type="button" className="btn btn-primary" onClick={goToSignature}>
-                    Confirm
+                  <button type="button" className="btn btn-primary" onClick={goToSignature} disabled={updating}>
+                    {updating ? "Confirming..." : "Confirm"}
                   </button>
                 </div>
               </div>

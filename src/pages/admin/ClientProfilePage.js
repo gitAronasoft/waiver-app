@@ -5,6 +5,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Header from "./components/header";
 import { getCurrentESTTime } from "../../utils/time";
+import { BACKEND_URL } from '../../config';
 
 
 function ProfilePage() {
@@ -16,7 +17,6 @@ function ProfilePage() {
   const [showHistory, setShowHistory] = useState(true);
 
   const pdfRef = useRef();
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
     axios
@@ -129,7 +129,6 @@ const handleDownloadPDF = async () => {
     const usableHeight = pageHeight - margin * 2;
 
     const imgWidth = usableWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
     const pageCanvasHeight = (usableHeight * canvas.width) / imgWidth;
 
     let renderedHeight = 0;

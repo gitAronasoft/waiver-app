@@ -1,6 +1,15 @@
 const db = require('../config/database');
 // const addToMailchimp = require('../utils/mailchimp');
 
+/**
+ * Creates a new waiver for a customer
+ * Handles both new and existing customers
+ * Uses transaction to ensure data consistency
+ * 
+ * Index suggestions:
+ * - CREATE INDEX idx_customers_cell_phone ON customers(cell_phone)
+ * - CREATE INDEX idx_minors_customer_id ON minors(customer_id)
+ */
 const createWaiver = async (req, res) => {
   const connection = await db.getConnection();
   
@@ -25,6 +34,25 @@ const createWaiver = async (req, res) => {
       minors,
       send_otp
     } = req.body;
+
+    // Validate required fields
+    if (!first_name || !last_name || !cell_phone) {
+      await connection.rollback();
+      connection.release();
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        details: 'First name, last name, and cell phone are required'
+      });
+    }
+
+    // Validate email format if provided
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      await connection.rollback();
+      connection.release();
+      return res.status(400).json({ 
+        error: 'Invalid email format'
+      });
+    }
 
     let customerId;
     
@@ -57,20 +85,29 @@ const createWaiver = async (req, res) => {
       customerId = result.insertId;
     }
 
+    // Delete existing minors for this customer
     await connection.query(
       'DELETE FROM minors WHERE customer_id = ?',
       [customerId]
     );
 
+    // Batch insert minors if any
     if (minors && minors.length > 0) {
-      for (const minor of minors) {
-        await connection.query(
-          'INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, 1)',
-          [customerId, minor.first_name, minor.last_name, minor.dob]
-        );
-      }
+      const minorValues = minors.map(minor => [
+        customerId, 
+        minor.first_name, 
+        minor.last_name, 
+        minor.dob, 
+        1
+      ]);
+      
+      await connection.query(
+        'INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?',
+        [minorValues]
+      );
     }
 
+    // Create waiver form entry
     const [waiverResult] = await connection.query(
       'INSERT INTO waiver_forms (user_id, signed_at, completed, verified_by_staff, staff_id) VALUES (?, NULL, 0, 0, 0)',
       [customerId]
@@ -88,16 +125,38 @@ const createWaiver = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error('Error creating waiver:', error);
-    res.status(500).json({ error: 'Failed to create waiver' });
+    
+    // Log error details for debugging
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error creating waiver:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    
+    // Send sanitized error to client
+    res.status(500).json({ 
+      error: 'Failed to create waiver',
+      errorId 
+    });
   } finally {
     connection.release();
   }
 };
 
+/**
+ * Gets customer information by phone number
+ * Includes associated minors
+ */
 const getCustomerInfo = async (req, res) => {
   try {
     const { phone } = req.query;
+
+    // Validate phone parameter
+    if (!phone) {
+      return res.status(400).json({ 
+        error: 'Phone number is required' 
+      });
+    }
 
     const [customers] = await db.query(
       'SELECT * FROM customers WHERE cell_phone = ?',
@@ -105,7 +164,9 @@ const getCustomerInfo = async (req, res) => {
     );
 
     if (customers.length === 0) {
-      return res.status(404).json({ message: 'Customer not found' });
+      return res.status(404).json({ 
+        error: 'Customer not found' 
+      });
     }
 
     const customer = customers[0];
@@ -117,11 +178,22 @@ const getCustomerInfo = async (req, res) => {
 
     res.json({ customer, minors });
   } catch (error) {
-    console.error('Error fetching customer info:', error);
-    res.status(500).json({ error: 'Failed to fetch customer info' });
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching customer info:`, {
+      message: error.message,
+      phone: req.query.phone
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch customer information',
+      errorId 
+    });
   }
 };
 
+/**
+ * Updates customer information and associated minors
+ */
 const updateCustomer = async (req, res) => {
   try {
     const {
@@ -139,6 +211,32 @@ const updateCustomer = async (req, res) => {
       minors
     } = req.body;
 
+    // Validate required fields
+    if (!id) {
+      return res.status(400).json({ 
+        error: 'Customer ID is required' 
+      });
+    }
+
+    // Validate email format if provided
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ 
+        error: 'Invalid email format'
+      });
+    }
+
+    // Check if customer exists
+    const [existingCustomer] = await db.query(
+      'SELECT id FROM customers WHERE id = ?',
+      [id]
+    );
+
+    if (existingCustomer.length === 0) {
+      return res.status(404).json({ 
+        error: 'Customer not found' 
+      });
+    }
+
     await db.query(
       `UPDATE customers SET 
         first_name = ?, last_name = ?, email = ?, dob = ?, 
@@ -149,6 +247,7 @@ const updateCustomer = async (req, res) => {
        postal_code, cell_phone, can_email, id]
     );
 
+    // Update minors if provided
     if (minors && minors.length > 0) {
       for (const minor of minors) {
         if (minor.isNew) {
@@ -165,22 +264,45 @@ const updateCustomer = async (req, res) => {
       }
     }
 
-    res.json({ success: true, message: 'Customer updated successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Customer updated successfully' 
+    });
   } catch (error) {
-    console.error('Error updating customer:', error);
-    res.status(500).json({ error: 'Failed to update customer' });
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error updating customer:`, {
+      message: error.message,
+      customerId: req.body.id
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to update customer',
+      errorId 
+    });
   }
 };
 
+/**
+ * Saves customer signature to waiver form
+ */
 const saveSignature = async (req, res) => {
   try {
     const { id, phone, signature, fullName, date, minors, subscribed, consented } = req.body;
 
+    // Validate required fields
+    if (!id || !signature) {
+      return res.status(400).json({ 
+        error: 'Customer ID and signature are required' 
+      });
+    }
+
+    // Update customer signature
     await db.query(
       'UPDATE customers SET signature = ?, updated_at = NOW() WHERE id = ?',
       [signature, id]
     );
 
+    // Get or create waiver form
     const [waivers] = await db.query(
       'SELECT id FROM waiver_forms WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
       [id]
@@ -207,26 +329,48 @@ const saveSignature = async (req, res) => {
       waiverId
     });
   } catch (error) {
-    console.error('Error saving signature:', error);
-    res.status(500).json({ error: 'Failed to save signature' });
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error saving signature:`, {
+      message: error.message,
+      customerId: req.body.id
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to save signature',
+      errorId 
+    });
   }
 };
 
+/**
+ * Marks waiver rules as accepted and completes the waiver
+ */
 const acceptRules = async (req, res) => {
   try {
     const { userId } = req.body;
+
+    // Validate userId
+    if (!userId) {
+      return res.status(400).json({ 
+        error: 'User ID is required' 
+      });
+    }
 
     const [waivers] = await db.query(
       'SELECT id FROM waiver_forms WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
       [userId]
     );
 
-    if (waivers.length > 0) {
-      await db.query(
-        'UPDATE waiver_forms SET rules_accepted = 1, completed = 1 WHERE id = ?',
-        [waivers[0].id]
-      );
+    if (waivers.length === 0) {
+      return res.status(404).json({ 
+        error: 'No waiver form found for this user' 
+      });
     }
+
+    await db.query(
+      'UPDATE waiver_forms SET rules_accepted = 1, completed = 1 WHERE id = ?',
+      [waivers[0].id]
+    );
 
     // MAILCHIMP INTEGRATION - Uncomment when credentials are added
     // Get customer info for Mailchimp
@@ -243,22 +387,42 @@ const acceptRules = async (req, res) => {
     //       customer.city,
     //       customer.address
     //     );
-    //     console.log('✅ Customer added to Mailchimp');
     //   } catch (mailchimpError) {
-    //     console.error('⚠️ Mailchimp error:', mailchimpError.message);
+    //     console.error('Mailchimp integration error:', mailchimpError.message);
     //   }
     // }
 
-    res.json({ success: true, message: 'Rules accepted successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Rules accepted successfully' 
+    });
   } catch (error) {
-    console.error('Error accepting rules:', error);
-    res.status(500).json({ error: 'Failed to accept rules' });
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error accepting rules:`, {
+      message: error.message,
+      userId: req.body.userId
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to accept rules',
+      errorId 
+    });
   }
 };
 
+/**
+ * Gets minors associated with a customer by phone number
+ */
 const getMinors = async (req, res) => {
   try {
     const { phone } = req.query;
+
+    // Validate phone parameter
+    if (!phone) {
+      return res.status(400).json({ 
+        error: 'Phone number is required' 
+      });
+    }
 
     const [customers] = await db.query(
       'SELECT id FROM customers WHERE cell_phone = ?',
@@ -276,13 +440,32 @@ const getMinors = async (req, res) => {
 
     res.json({ minors });
   } catch (error) {
-    console.error('Error fetching minors:', error);
-    res.status(500).json({ error: 'Failed to fetch minors' });
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching minors:`, {
+      message: error.message,
+      phone: req.query.phone
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch minors',
+      errorId 
+    });
   }
 };
 
+/**
+ * Gets all completed waivers with customer and minor information
+ * Optimized to avoid N+1 query problem using LEFT JOIN and GROUP_CONCAT
+ * 
+ * Index suggestions:
+ * - CREATE INDEX idx_waiver_forms_completed ON waiver_forms(completed, created_at)
+ * - CREATE INDEX idx_waiver_forms_user_id ON waiver_forms(user_id)
+ * - CREATE INDEX idx_minors_customer_status ON minors(customer_id, status)
+ */
 const getAllCustomers = async (req, res) => {
   try {
+    // Optimized query to fetch all data in a single query using LEFT JOIN
+    // GROUP_CONCAT aggregates minors data to avoid N+1 query problem
     const [waivers] = await db.query(`
       SELECT 
         c.id,
@@ -299,48 +482,119 @@ const getAllCustomers = async (req, res) => {
         wf.verified_by_staff,
         wf.rating_email_sent,
         wf.rating_sms_sent,
-        wf.completed
+        wf.completed,
+        GROUP_CONCAT(
+          CONCAT(m.first_name, '|', m.last_name) 
+          ORDER BY m.id 
+          SEPARATOR '@@'
+        ) as minors_data
       FROM waiver_forms wf
       JOIN customers c ON wf.user_id = c.id
+      LEFT JOIN minors m ON m.customer_id = c.id AND m.status = 1
       WHERE wf.completed = 1
+      GROUP BY wf.id, c.id, c.first_name, c.last_name, c.cell_phone, c.email, 
+               c.address, c.city, c.province, c.postal_code, wf.signed_at, 
+               wf.verified_by_staff, wf.rating_email_sent, wf.rating_sms_sent, wf.completed
       ORDER BY wf.created_at DESC
     `);
 
-    for (let waiver of waivers) {
-      const [minors] = await db.query(
-        'SELECT first_name, last_name FROM minors WHERE customer_id = ? AND status = 1',
-        [waiver.id]
-      );
-      waiver.minors = minors;
-    }
+    // Parse minors data from GROUP_CONCAT result
+    const result = waivers.map(waiver => {
+      const minors = [];
+      if (waiver.minors_data) {
+        const minorEntries = waiver.minors_data.split('@@');
+        minorEntries.forEach(entry => {
+          const [first_name, last_name] = entry.split('|');
+          if (first_name && last_name) {
+            minors.push({ first_name, last_name });
+          }
+        });
+      }
+      
+      // Remove minors_data field and add parsed minors array
+      const { minors_data, ...waiverData } = waiver;
+      return { ...waiverData, minors };
+    });
 
-    res.json(waivers);
+    res.json(result);
   } catch (error) {
-    console.error('Error fetching customers:', error);
-    res.status(500).json({ error: 'Failed to fetch customers' });
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching customers:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch customers',
+      errorId 
+    });
   }
 };
 
+/**
+ * Updates waiver verification status
+ */
 const verifyWaiver = async (req, res) => {
   try {
     const { id } = req.params;
     const { staff_id, verified_by_staff } = req.body;
+
+    // Validate required fields
+    if (!id) {
+      return res.status(400).json({ 
+        error: 'Waiver ID is required' 
+      });
+    }
+
+    // Check if waiver exists
+    const [existingWaiver] = await db.query(
+      'SELECT id FROM waiver_forms WHERE id = ?',
+      [id]
+    );
+
+    if (existingWaiver.length === 0) {
+      return res.status(404).json({ 
+        error: 'Waiver not found' 
+      });
+    }
 
     await db.query(
       'UPDATE waiver_forms SET verified_by_staff = ?, staff_id = ? WHERE id = ?',
       [verified_by_staff, staff_id, id]
     );
 
-    res.json({ success: true, message: 'Waiver verification updated' });
+    res.json({ 
+      success: true, 
+      message: 'Waiver verification updated' 
+    });
   } catch (error) {
-    console.error('Error verifying waiver:', error);
-    res.status(500).json({ error: 'Failed to verify waiver' });
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error verifying waiver:`, {
+      message: error.message,
+      waiverId: req.params.id
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to verify waiver',
+      errorId 
+    });
   }
 };
 
+/**
+ * Gets detailed information about a specific waiver
+ * Includes customer and minor information
+ */
 const getWaiverDetails = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Validate waiver ID
+    if (!id) {
+      return res.status(400).json({ 
+        error: 'Waiver ID is required' 
+      });
+    }
 
     const [waivers] = await db.query(`
       SELECT 
@@ -356,7 +610,9 @@ const getWaiverDetails = async (req, res) => {
     `, [id]);
 
     if (waivers.length === 0) {
-      return res.status(404).json({ message: 'Waiver not found' });
+      return res.status(404).json({ 
+        error: 'Waiver not found' 
+      });
     }
 
     const waiver = waivers[0];
@@ -370,14 +626,33 @@ const getWaiverDetails = async (req, res) => {
 
     res.json(waiver);
   } catch (error) {
-    console.error('Error fetching waiver details:', error);
-    res.status(500).json({ error: 'Failed to fetch waiver details' });
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching waiver details:`, {
+      message: error.message,
+      waiverId: req.params.id
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch waiver details',
+      errorId 
+    });
   }
 };
 
+/**
+ * Gets waiver history for a customer by phone number
+ * Optimized to fetch minors only once instead of in a loop
+ */
 const getUserHistory = async (req, res) => {
   try {
     const { phone } = req.params;
+
+    // Validate phone parameter
+    if (!phone) {
+      return res.status(400).json({ 
+        error: 'Phone number is required' 
+      });
+    }
 
     const [customers] = await db.query(
       'SELECT id FROM customers WHERE cell_phone = ?',
@@ -390,30 +665,46 @@ const getUserHistory = async (req, res) => {
 
     const customerId = customers[0].id;
 
-    const [waivers] = await db.query(`
-      SELECT 
-        wf.id,
-        wf.signed_at,
-        wf.verified_by_staff,
-        wf.completed,
-        wf.created_at
-      FROM waiver_forms wf
-      WHERE wf.user_id = ?
-      ORDER BY wf.created_at DESC
-    `, [customerId]);
-
-    for (let waiver of waivers) {
-      const [minors] = await db.query(
-        'SELECT first_name, last_name FROM minors WHERE customer_id = ?',
+    // Fetch waivers and minors in parallel for better performance
+    const [waiversResult, minorsResult] = await Promise.all([
+      db.query(`
+        SELECT 
+          wf.id,
+          wf.signed_at,
+          wf.verified_by_staff,
+          wf.completed,
+          wf.created_at
+        FROM waiver_forms wf
+        WHERE wf.user_id = ?
+        ORDER BY wf.created_at DESC
+      `, [customerId]),
+      db.query(
+        'SELECT first_name, last_name FROM minors WHERE customer_id = ? AND status = 1',
         [customerId]
-      );
-      waiver.minors = minors;
-    }
+      )
+    ]);
 
-    res.json({ waivers });
+    const [waivers] = waiversResult;
+    const [minors] = minorsResult;
+
+    // Attach same minors list to all waivers (they belong to the customer)
+    const waiversWithMinors = waivers.map(waiver => ({
+      ...waiver,
+      minors
+    }));
+
+    res.json({ waivers: waiversWithMinors });
   } catch (error) {
-    console.error('Error fetching user history:', error);
-    res.status(500).json({ error: 'Failed to fetch user history' });
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching user history:`, {
+      message: error.message,
+      phone: req.params.phone
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch user history',
+      errorId 
+    });
   }
 };
 

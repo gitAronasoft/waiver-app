@@ -11,12 +11,11 @@ import "datatables.net-responsive-dt/css/responsive.dataTables.css";
 
 import Header from "./components/header";
 import { convertToEST } from "../../utils/time";
+import { BACKEND_URL } from '../../config';
 
 const AdminFeedbackPage = () => {
   const [feedbackList, setFeedbackList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const BACKEND_URL =
-    process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 
   // Escape HTML safely for tooltip
   const escapeHtml = (str) =>
@@ -44,7 +43,7 @@ const AdminFeedbackPage = () => {
         setLoading(false);
       }
     })();
-  }, [BACKEND_URL]);
+  }, []);
 
   // Initialize DataTable after feedback loads
   useEffect(() => {
@@ -55,7 +54,7 @@ const AdminFeedbackPage = () => {
     }
 
     setTimeout(() => {
-      const dt = $("#feedbackTable").DataTable({
+      $("#feedbackTable").DataTable({
         data: feedbackList,
         responsive: true,
         paging: true,

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { BACKEND_URL } from '../../config';
 
 function ResetPasswordForm() {
   const [searchParams] = useSearchParams();
@@ -14,6 +15,7 @@ function ResetPasswordForm() {
 
   const [email, setEmail] = useState("");
   const [id, setId] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const encodedEmail = searchParams.get("email");
@@ -29,9 +31,9 @@ function ResetPasswordForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
-      const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
       const response = await axios.post(`${BACKEND_URL}/api/staff/update-password`, {
         email,
         id,
@@ -48,7 +50,9 @@ function ResetPasswordForm() {
 
     navigate("/admin/home"); // Redirect to home after login
     } catch (err) {
-      toast.error(err.response?.data || "Error resetting password");
+      toast.error(err.response?.data?.error || err.response?.data?.message || "Error resetting password");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,7 +90,9 @@ function ResetPasswordForm() {
             required
           />
         </div>
-        <button type="submit" className="btn btn-primary w-100">Update Password</button>
+        <button type="submit" className="btn btn-primary w-100" disabled={loading}>
+          {loading ? "Updating..." : "Update Password"}
+        </button>
       </form>
           </div>
           </div>

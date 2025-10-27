@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import SignaturePad from "react-signature-canvas";
 import axios from "axios";
 import { toast } from 'react-toastify';
+import { BACKEND_URL } from '../config';
 
 
 
@@ -12,11 +13,11 @@ function Signature() {
   const navigate = useNavigate();
   const sigPadRef = useRef();
 
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-
   const [signatureImage, setSignatureImage] = useState(null);
   const [initials, setInitials] = useState("");
   const [customerData, setCustomerData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const customerType = location.state?.customerType || "existing";
   const phone = location.state?.phone;
@@ -46,7 +47,7 @@ function Signature() {
     const savedData = localStorage.getItem("signatureForm");
     if (savedData) {
       const parsed = JSON.parse(savedData);
-      setForm(parsed.form || form);
+      setForm(parsed.form);
       setInitials(parsed.initials || "");
       setSignatureImage(parsed.signatureImage || null);
 
@@ -56,11 +57,13 @@ function Signature() {
         }, 300);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save data to localStorage whenever form/signature changes
   useEffect(() => {
     persistToLocalStorage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, initials, signatureImage]);
 
   // Fetch customer data only if no meaningful local data exists
@@ -84,6 +87,7 @@ function Signature() {
     // console.log("LocalStorage empty, fetching customer data...");
 
     const fetchCustomer = async () => {
+      setLoading(true);
       try {
         const response = await axios.get(
           `${BACKEND_URL}/api/waivers/getminors?phone=${phone}`
@@ -107,6 +111,8 @@ function Signature() {
       } catch (error) {
         console.error("Failed to fetch customer data:", error);
         toast.error("Failed to load customer data.");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -166,10 +172,40 @@ function Signature() {
   };
 
   const handleSubmit = async () => {
-    if (!form.consented || sigPadRef.current.isEmpty()) {
-      toast.error("Please agree to the terms and provide a signature.");
+    if (!form.consented) {
+      toast.error("Please agree to the terms by checking the consent box.");
       return;
     }
+
+    if (sigPadRef.current.isEmpty()) {
+      toast.error("Please provide your signature before continuing.");
+      return;
+    }
+
+    const checkedMinors = form.minors.filter(m => m.checked);
+    if (checkedMinors.length > 0) {
+      const invalidMinors = checkedMinors.filter(
+        m => !m.first_name.trim() || !m.last_name.trim() || !m.dob
+      );
+      
+      if (invalidMinors.length > 0) {
+        toast.error("Please complete all information (first name, last name, and date of birth) for all checked minors.");
+        return;
+      }
+
+      const minorsWithFutureDOB = checkedMinors.filter(m => {
+        const dobDate = new Date(m.dob);
+        const today = new Date();
+        return dobDate > today;
+      });
+
+      if (minorsWithFutureDOB.length > 0) {
+        toast.error("Date of birth cannot be in the future for any minor.");
+        return;
+      }
+    }
+
+    setSubmitting(true);
 
     //const signatureData = sigPadRef.current.getCanvas().toDataURL("image/png");
     // const signatureData = sigPadRef.current.getCanvas().toDataURL("image/jpeg", 0.6); // ✅ Compress signature
@@ -210,6 +246,8 @@ function Signature() {
     } catch (error) {
       console.error(error);
       toast.error("Failed to save signature.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -224,6 +262,16 @@ function formatPhone(phone = "") {
 
 
   // if (!customerData) return <div className="text-center mt-5">Loading...</div>;
+
+  if (loading) {
+    return (
+      <div className="container-fluid">
+        <div className="container text-center mt-5">
+          <p>Loading customer information...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container-fluid">
@@ -478,8 +526,8 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
        
 
               <div>
-                <button className="btn btn-primary no-print" onClick={handleSubmit}>
-                  Accept and Continue
+                <button className="btn btn-primary no-print" onClick={handleSubmit} disabled={submitting}>
+                  {submitting ? "Submitting..." : "Accept and Continue"}
                 </button>
               </div>
             </div>

@@ -3,9 +3,15 @@ const router = express.Router();
 const staffController = require('../controllers/staffController');
 const { authenticateToken } = require('../middleware/auth');
 
+// Public routes (no authentication required)
 router.post('/login', staffController.login);
 router.post('/forget-password', staffController.forgetPassword);
 router.post('/update-password', staffController.updatePassword);
+
+// Protected routes (authentication required)
+// Apply authentication middleware to all routes below
+router.use(authenticateToken);
+
 router.post('/change-password', staffController.changePassword);
 router.get('/getstaff', staffController.getAllStaff);
 router.get('/:id', staffController.getStaffById);

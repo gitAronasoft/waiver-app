@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { BACKEND_URL } from '../config';
 
 function RuleReminder() {
   const navigate = useNavigate();
@@ -9,9 +10,10 @@ function RuleReminder() {
   const userId = location.state?.userId;
   const phone = location.state?.phone;
   const customerType = location.state?.customerType || "existing";
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+  const [loading, setLoading] = useState(false);
 
   const handleConfirm = async () => {
+    setLoading(true);
     try {
       await axios.post(`${BACKEND_URL}/api/waivers/accept-rules`, { userId });
       localStorage.removeItem("signatureForm"); // Clear saved signature and form data
@@ -20,6 +22,8 @@ function RuleReminder() {
     } catch (error) {
       console.error(error);
       toast.error("Failed to update waiver status.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -95,8 +99,8 @@ function RuleReminder() {
             </div>
 
             <div>
-              <button className="confirm-btn" onClick={handleConfirm}>
-                Confirm
+              <button className="confirm-btn" onClick={handleConfirm} disabled={loading}>
+                {loading ? "Confirming..." : "Confirm"}
               </button>
             </div>
           </div>

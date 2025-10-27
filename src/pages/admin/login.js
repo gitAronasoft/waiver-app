@@ -2,19 +2,46 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from "react-router-dom";
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { BACKEND_URL } from '../../config';
 
 function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    try {
-      const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+    if (!email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
 
+    if (!validateEmail(email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    if (!password.trim()) {
+      toast.error("Password is required");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
       const response = await axios.post(`${BACKEND_URL}/api/staff/login`, {
         email,
         password,
@@ -30,10 +57,12 @@ function LoginPage() {
       navigate("/admin/home");
     } catch (err) {
       if (err.response) {
-        toast.error(err.response.data.message);
+        toast.error(err.response.data.error || err.response.data.message || "Invalid email or password");
       } else {
-        toast.error("Something went wrong");
+        toast.error("Unable to connect. Please check your internet connection and try again.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -94,8 +123,8 @@ function LoginPage() {
                   </label>
                 </div>
 
-                <button type="submit" className="login-btn btn btn-primary w-100">
-                  Login
+                <button type="submit" className="login-btn btn btn-primary w-100" disabled={loading}>
+                  {loading ? "Logging in..." : "Login"}
                 </button>
 
              <p className="signup-text text-center mt-3">

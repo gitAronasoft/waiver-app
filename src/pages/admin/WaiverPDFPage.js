@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import axios from "axios";
+import { BACKEND_URL } from '../../config';
 
 
 function WaiverPDFPage() {
@@ -10,7 +11,6 @@ function WaiverPDFPage() {
   const [customer, setCustomer] = useState(null);
   const [minors, setMinors] = useState([]);
   const pdfRef = useRef();
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
     axios

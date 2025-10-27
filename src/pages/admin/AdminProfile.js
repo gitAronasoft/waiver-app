@@ -2,10 +2,9 @@ import React, { useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import Header from "./components/header";
+import { BACKEND_URL } from '../../config';
 
 function AdminProfile() {
-  const BACKEND_URL =
-    process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
   const staff = JSON.parse(localStorage.getItem("staff")) || {};
 
   // Initialize admin state directly (no useEffect needed)
@@ -32,9 +31,29 @@ function AdminProfile() {
     }
   };
 
-  // Submit form
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!admin.name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    
+    if (!admin.email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+    
+    if (!validateEmail(admin.email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    
     setLoading(true);
 
     try {

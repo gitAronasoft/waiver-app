@@ -1,22 +1,66 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { useMask } from "@react-input/mask"; // ✅ Import mask hook
+import { useMask } from "@react-input/mask";
 import { countryCodes } from "../countryCodes";
+import { BACKEND_URL } from '../config';
 
 function ExistingCustomerLogin() {
   const [phone, setPhone] = useState("");
   const navigate = useNavigate();
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+  const [loading, setLoading] = useState(false);
 
   const [countryCode, setCountryCode] = useState("+1");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
+  const dropdownRef = useRef(null);
 
   // ✅ Phone mask ref
   const phoneRef = useMask({
     mask: "(___) ___-____",
     replacement: { _: /\d/ },
   });
+
+  // Handle country selection
+  const handleCountrySelect = (code) => {
+    setCountryCode(code);
+    setIsDropdownOpen(false);
+    setCountrySearch("");
+  };
+
+  // Filter countries based on search
+  const filteredCountryCodes = countryCodes.filter((country) =>
+    country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+    country.code.includes(countrySearch)
+  );
+
+  // Handle click outside and Escape key
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+        setCountrySearch("");
+      }
+    };
+
+    const handleEscapeKey = (event) => {
+      if (event.key === "Escape") {
+        setIsDropdownOpen(false);
+        setCountrySearch("");
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscapeKey);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, [isDropdownOpen]);
 
   const handleKeypadClick = (value) => {
     if (value === "Clear") {
@@ -52,14 +96,30 @@ function ExistingCustomerLogin() {
   }, [phone]);
 
   const sendOtp = async () => {
+    if (loading) return;
+    
+    const cleanPhone = phone.replace(/\D/g, "");
+    
+    if (cleanPhone.length === 0) {
+      toast.error("Please enter your phone number");
+      return;
+    }
+    
+    if (cleanPhone.length < 10) {
+      toast.error(`Phone number must be exactly 10 digits. You entered ${cleanPhone.length} digits.`);
+      return;
+    }
+    
+    setLoading(true);
     try {
-      const cleanPhone = phone.replace(/\D/g, ""); // ✅ strip mask before sending
       const fullPhone = `${countryCode}${cleanPhone}`;   
       const res = await axios.post(`${BACKEND_URL}/api/auth/send-otp`, { cell_phone: fullPhone, phone: cleanPhone });
       toast.success(res.data.message);
       navigate("/opt-verified", { state: { phone: cleanPhone, customerType: "existing" } });
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Error sending OTP");
+      toast.error(err?.response?.data?.message || "Error sending OTP. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -95,6 +155,7 @@ function ExistingCustomerLogin() {
               </div>
               <h5 className="bold">Please enter your phone number</h5>
               <p className="bold mb-3">A text message will be sent to you for verification</p>
+              {loading && <p className="text-center text-primary">Sending OTP...</p>}
 
               {/* <div className="pin-inputs d-flex justify-content-center gap-3">
                 <input
@@ -110,55 +171,68 @@ function ExistingCustomerLogin() {
               </div> */}
 
               <div className="pin-inputs d-flex justify-content-center align-items-center flex-wrap">
-                <div className="dropdown" style={{ position: "relative" }}>
-                  <button
-                    className="btn dropdown-toggle"
-                    type="button"
-                    data-bs-toggle="dropdown"
-                    aria-expanded="false"
+                <div className="custom-dropdown" style={{ position: "relative" }} ref={dropdownRef}>
+                  <div
+                    className="form-select"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     style={{
+                      cursor: "pointer",
                       minWidth: "75px",
-                      height: "45px",                  
+                      height: "45px",
                       border: "1px solid #ccc",
                       borderRight: "0",
-                        borderRadius: "unset",          // reset all corners
-                        borderTopLeftRadius: "8px",     // round top-left
-                        // borderTopRightRadius: "8px", // keep sharp
-                        borderBottomLeftRadius: "8px",  // round bottom-left
-                        // borderBottomRightRadius: "8px", // keep sharp
+                      borderRadius: "unset",
+                      borderTopLeftRadius: "8px",
+                      borderBottomLeftRadius: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
                     }}
                   >
                     {countryCode}
-                  </button>
+                  </div>
 
-                  <ul
-                    className="dropdown-menu"
-                    style={{
-                      maxHeight: "250px",
-                      // overflowY: "auto",
-                      // width: "220px",
-                      
-                        overflowY: "scroll",
-                        scrollbarWidth: "none !important", // Firefox
-                        msOverflowStyle: "none", // IE and Edge
+                  {isDropdownOpen && (
+                    <div
+                      className="dropdown-menu show"
+                      style={{
                         position: "absolute",
-                        inset: "0px auto auto 0px",
-                        margin: "0px",
-                        transform: "translate(0px, 52px)",
-                     
-                    }}
-                  >
-                    {countryCodes.map((c, i) => (
-                      <li key={i}>
-                        <button
-                          className="dropdown-item"
-                          onClick={() => setCountryCode(c.code)}
-                        >
-                         <span className="me-1"> {c.code} </span>   {c.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                        maxHeight: "250px",
+                        overflowY: "auto",
+                        zIndex: 1000,
+                        width: "300px",
+                        top: "50px"
+                      }}
+                    >
+                      <div style={{ position: 'sticky', top: 0, background: 'white', padding: '8px', borderBottom: '1px solid #ddd' }}>
+                        <input
+                          type="text"
+                          placeholder="Search country or code..."
+                          value={countrySearch}
+                          onChange={(e) => setCountrySearch(e.target.value)}
+                          className="form-control form-control-sm"
+                          onClick={(e) => e.stopPropagation()}
+                          autoFocus
+                        />
+                      </div>
+                      {filteredCountryCodes.length > 0 ? (
+                        filteredCountryCodes.map((c, index) => (
+                          <div
+                            key={index}
+                            className="dropdown-item"
+                            onClick={() => handleCountrySelect(c.code)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            {c.code} - {c.name}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="dropdown-item" style={{ color: '#999' }}>
+                          No countries found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <input

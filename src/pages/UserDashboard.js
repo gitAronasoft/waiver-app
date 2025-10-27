@@ -4,6 +4,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import { BACKEND_URL } from '../config';
 
 function UserDashboard() {
   const location = useLocation();
@@ -11,7 +12,6 @@ function UserDashboard() {
   const phone = location.state?.phone;
   const [waivers, setWaivers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
     if (!phone) {

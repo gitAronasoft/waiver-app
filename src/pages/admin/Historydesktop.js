@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import Header from './components/header';
 import Switch from "react-switch";
 import DataTable from 'react-data-table-component';
+import { BACKEND_URL } from '../../config';
 
 function HistoryPage() {
   const [waivers, setWaivers] = useState([]);
@@ -20,7 +21,6 @@ function HistoryPage() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const navigate = useNavigate();
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   // Detect mobile resize
   useEffect(() => {
@@ -42,7 +42,7 @@ function HistoryPage() {
         toast.error("Failed to load waivers.");
       })
       .finally(() => setLoading(false));
-  }, [BACKEND_URL]);
+  }, []);
 
   // Filter & search
   useEffect(() => {

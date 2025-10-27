@@ -2,15 +2,16 @@ import React, { useState, useRef } from "react";
 import axios from "axios";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from 'react-toastify';
+import { BACKEND_URL } from '../config';
 
 function VerifyOtp() {
   const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const phone = location.state?.phone;
   const customerType = location.state?.customerType || "existing";
   const otpVerifiedRef = useRef(false);
-    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   // console.log("OTP Verified:", customerType);
 
@@ -39,8 +40,20 @@ function VerifyOtp() {
   };
 
 const verifyOtp = async (otpValue) => {
-  if (otpVerifiedRef.current) return; // prevent multiple calls
+  if (otpVerifiedRef.current) return;
+  
+  if (!otpValue || otpValue.trim() === "") {
+    toast.error("Please enter the OTP code");
+    return;
+  }
+  
+  if (otpValue.length < 4) {
+    toast.error(`OTP must be 4 digits. You entered ${otpValue.length} digits.`);
+    return;
+  }
+  
   otpVerifiedRef.current = true;
+  setLoading(true);
 
   try {
     const res = await axios.post(`${BACKEND_URL}/api/auth/verify-otp`, {
@@ -49,7 +62,7 @@ const verifyOtp = async (otpValue) => {
     });
 
     if (res.data.authenticated) {
-      toast.success("✅ OTP Verified Successfully!");
+      toast.success("OTP Verified Successfully!");
 
       if (customerType === "dashboard") {
         navigate("/my-waivers", { state: { phone } });
@@ -59,12 +72,16 @@ const verifyOtp = async (otpValue) => {
         navigate("/signature", { state: { phone } });
       }
     } else {
-      toast.error("🚫 Invalid OTP. Please try again.");
+      toast.error("Invalid OTP. Please try again.");
       otpVerifiedRef.current = false;
+      setLoading(false);
+      setOtp("");
     }
   } catch (err) {
-    toast.error(err?.response?.data?.message || "❌ OTP verification failed");
+    toast.error(err?.response?.data?.message || "OTP verification failed. Please try again.");
     otpVerifiedRef.current = false;
+    setLoading(false);
+    setOtp("");
   }
 };
 
@@ -99,6 +116,7 @@ const verifyOtp = async (otpValue) => {
               <h5 className="my-4">
                 Please enter the 4 digit PIN sent to your phone number
               </h5>
+              {loading && <p className="text-center text-primary">Verifying OTP...</p>}
 
               <div className="pin-inputs d-flex justify-content-center gap-3">
                 <input

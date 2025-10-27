@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import $ from "jquery";
 
@@ -13,6 +13,7 @@ import Header from "./components/header";
 import { toast } from "react-toastify";
 import Switch from "react-switch";
 import { useNavigate } from "react-router-dom";
+import { BACKEND_URL } from '../../config';
 
 const StaffList = () => {
   const [staff, setStaff] = useState([]);
@@ -21,15 +22,9 @@ const StaffList = () => {
   const [selectedStaffName, setSelectedStaffName] = useState("");
   const [showModal, setShowModal] = useState(false);
 
-  const BACKEND_URL =
-    process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchStaff();
-  }, []);
-
-  const fetchStaff = async () => {
+  const fetchStaff = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get(`${BACKEND_URL}/api/staff/getstaff`);
@@ -40,7 +35,11 @@ const StaffList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
 
   const toggleStatus = async (id, currentStatus) => {
     try {

@@ -3,24 +3,42 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import Header from "./components/header";
+import { BACKEND_URL } from '../../config';
 
 function AddStaff() {
     const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", role: "" });
   const [loading, setLoading] = useState(false); // Spinner state
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.role) {
-      return toast.error("All fields are required");
+    
+    if (!form.name.trim()) {
+      return toast.error("Name is required");
+    }
+    
+    if (!form.email.trim()) {
+      return toast.error("Email is required");
+    }
+    
+    if (!validateEmail(form.email)) {
+      return toast.error("Please enter a valid email address");
+    }
+    
+    if (!form.role) {
+      return toast.error("Please select a role");
     }
 
-    setLoading(true); // Start spinner
+    setLoading(true);
 
     try {
       const res = await axios.post(`${BACKEND_URL}/api/staff/addstaff`, form);

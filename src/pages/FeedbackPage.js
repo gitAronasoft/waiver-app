@@ -1,24 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useLocation } from 'react-router-dom'; // ✅ make sure to import useLocation
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
+import { BACKEND_URL } from '../config';
 
 export default function FeedbackPage() {
   const query = new URLSearchParams(useLocation().search);
 const userId = query.get('userId');
 const feedbackId = query.get('feedbackId');
 
-  // const { userId } =  query.get('userId'); // user ID
-
-  // const query = new URLSearchParams(location.search);
-  // const feedbackId = query.get('feedbackId'); // ✅ get feedback ID from query string
-  const location = useLocation(); // ✅ initialize useLocation
   const [feedback, setFeedback] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [issue, setIssue] = useState('');
   const [staffName, setStaffName] = useState('');
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     axios
@@ -32,6 +28,7 @@ const feedbackId = query.get('feedbackId');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
       await axios.post(`${BACKEND_URL}/api/waivers/feedback`, {
@@ -54,7 +51,9 @@ const feedbackId = query.get('feedbackId');
       toast.success('Feedback submitted successfully!');
       setSubmitted(true);
     } catch (err) {
-      toast.error('Failed to send feedback. Try again later.');
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to send feedback. Try again later.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -125,8 +124,8 @@ const feedbackId = query.get('feedbackId');
                         />
                       </div>
 
-                      <button className="btn btn-primary" type="submit">
-                        Submit Feedback
+                      <button className="btn btn-primary" type="submit" disabled={loading}>
+                        {loading ? "Submitting..." : "Submit Feedback"}
                       </button>
                     </form>
                   </>

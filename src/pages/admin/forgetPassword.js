@@ -1,22 +1,26 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { BACKEND_URL } from '../../config';
 
 function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
-      const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000/";
       await axios.post(`${BACKEND_URL}/api/staff/forget-password`, { email });
       toast.success("Reset link sent! Check your email.");
         // ✅ Clear the input field after success
     setEmail("");
       
     } catch (err) {
-      toast.error(err.response?.data?.message || "Something went wrong");
+      toast.error(err.response?.data?.error || err.response?.data?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,8 +56,8 @@ function ForgotPasswordForm() {
                   />
                 </div>
 
-                <button type="submit" className="login-btn btn btn-primary w-100">
-                  Send Reset Link
+                <button type="submit" className="login-btn btn btn-primary w-100" disabled={loading}>
+                  {loading ? "Sending..." : "Send Reset Link"}
                 </button>
 
                 <p className="signup-text text-center mt-3">

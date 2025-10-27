@@ -2,46 +2,30 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Rating } from 'react-simple-star-rating';
 import axios from 'axios';
+import { BACKEND_URL, GOOGLE_REVIEW_LINK } from '../config';
 
 function StarRatingPage() {
   const { id } = useParams(); // waiver id
   const navigate = useNavigate();
-  const [rating, setRating] = useState(0);
   const [customerName, setCustomerName] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-  const GOOGLE_REVIEW_LINK = process.env.REACT_APP_GOOGLE_REVIEW_LINK;
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
 
 useEffect(() => {
+  setLoading(true);
   axios.get(`${BACKEND_URL}/api/waivers/rate/${id}`)
     .then(res => {
       const { first_name, last_name } = res.data;
       setCustomerName(`${first_name} ${last_name}`);
     })
-    .catch(err => console.error('Failed to fetch customer:', err));
+    .catch(err => console.error('Failed to fetch customer:', err))
+    .finally(() => setLoading(false));
 }, [id]);
 
 
   const handleRating = async (rate) => {
-    setRating(rate);
-    setSubmitted(true);
-
-    // try {
-    //   // await axios.post(`/api/waivers/rate/${id}`, { rating: rate });
-    //   await axios.post(`${BACKEND_URL}/api/waivers/rate/${id}`, { rating: rate });
-      
-    //   // Redirect after a short delay
-    //   setTimeout(() => {
-    //     if (rate === 5) {
-    //       window.location.href = 'https://g.page/YOUR_GOOGLE_REVIEW_LINK';
-    //     } else {
-    //       navigate(`/feedback/${id}`);
-    //     }
-    //   }, 1500);
-    // } catch (error) {
-    //   console.error('Rating submission error:', error);
-    // }
+    setSubmitting(true);
     try {
   const response = await axios.post(`${BACKEND_URL}/api/waivers/rate/${id}`, { rating: rate });
   const feedbackId = response.data.feedbackId;
@@ -50,13 +34,13 @@ useEffect(() => {
     if (rate === 5) {
          window.location.href = GOOGLE_REVIEW_LINK; 
     } else {
-      // Navigate with user id and feedback id
       navigate(`/feedback?userId=${id}&feedbackId=${feedbackId}`);
 
     }
   }, 1000);
 } catch (error) {
   console.error('Rating error:', error);
+  setSubmitting(false);
 }
 
   };
@@ -73,25 +57,32 @@ useEffect(() => {
                 alt="logo"
                 style={{ maxWidth: '200px' }}
               />
-              <h5 className="mb-3">Hi {customerName},</h5>
-              <h5 className="fw-bold mb-2">We’d love to know how your experience was.</h5>
-              <p className="fw-bold mb-3">Please take a few seconds to rate your visit:</p>
+              {loading ? (
+                <p>Loading...</p>
+              ) : (
+                <>
+                  <h5 className="mb-3">Hi {customerName},</h5>
+                  <h5 className="fw-bold mb-2">We'd love to know how your experience was.</h5>
+                  <p className="fw-bold mb-3">Please take a few seconds to rate your visit:</p>
+                  {submitting && <p className="text-primary">Submitting rating...</p>}
 
-              {/* ⭐ Star Rating */}
-              <div className="d-flex justify-content-center mb-4">
-                <Rating
-                    onClick={handleRating}
-                    size={50}
-                    initialValue={0}
-                    allowFraction={false}
-                    transition
-                  />
-              </div>
+                  <div className="d-flex justify-content-center mb-4">
+                    <Rating
+                        onClick={handleRating}
+                        size={50}
+                        initialValue={0}
+                        allowFraction={false}
+                        transition
+                        readonly={submitting}
+                      />
+                  </div>
 
-              
+                  
 
-              <h6 className="mb-2">It only takes a moment and really helps us improve.</h6>
-              <h6>Thanks for being part of the fun — we hope to see you again soon!</h6>
+                  <h6 className="mb-2">It only takes a moment and really helps us improve.</h6>
+                  <h6>Thanks for being part of the fun — we hope to see you again soon!</h6>
+                </>
+              )}
             </div>
           </div>
         </div>
