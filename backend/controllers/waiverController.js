@@ -1018,6 +1018,86 @@ const updateWaiverStatus = async (req, res) => {
   }
 };
 
+/**
+ * Get customer information for rating page
+ */
+const getRatingInfo = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ error: 'Valid customer ID is required' });
+    }
+
+    const [customers] = await db.query(
+      'SELECT first_name, last_name FROM customers WHERE id = ?',
+      [id]
+    );
+
+    if (customers.length === 0) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+
+    res.json({
+      first_name: customers[0].first_name,
+      last_name: customers[0].last_name
+    });
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching rating info:`, {
+      message: error.message,
+      customerId: req.params.id
+    });
+
+    res.status(500).json({
+      error: 'Failed to fetch customer information',
+      errorId
+    });
+  }
+};
+
+/**
+ * Save customer rating
+ */
+const saveRating = async (req, res) => {
+  try {
+    const { rating } = req.body;
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ error: 'Valid customer ID is required' });
+    }
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    // Insert new feedback row
+    const [result] = await db.query(
+      'INSERT INTO feedback (user_id, rating) VALUES (?, ?)',
+      [id, rating]
+    );
+
+    const feedbackId = result.insertId;
+
+    res.json({
+      message: 'Rating saved',
+      feedbackId
+    });
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error saving rating:`, {
+      message: error.message,
+      customerId: req.params.id
+    });
+
+    res.status(500).json({
+      error: 'Failed to save rating',
+      errorId
+    });
+  }
+};
+
 module.exports = {
   createWaiver,
   getCustomerInfo,
@@ -1032,4 +1112,6 @@ module.exports = {
   getAllWaivers,
   deleteWaiver,
   updateWaiverStatus,
+  getRatingInfo,
+  saveRating,
 };

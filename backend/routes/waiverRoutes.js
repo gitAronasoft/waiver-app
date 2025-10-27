@@ -13,6 +13,8 @@ router.get('/getallwaivers', waiverController.getAllWaivers);
 router.post('/verify/:id', waiverController.verifyWaiver);
 router.get('/waiver-details/:id', waiverController.getWaiverDetails);
 router.get('/user-history/:phone', waiverController.getUserHistory);
+router.get('/rate/:id', waiverController.getRatingInfo);
+router.post('/rate/:id', waiverController.saveRating);
 router.delete('/:id', waiverController.deleteWaiver);
 router.put('/:id/status', waiverController.updateWaiverStatus);
 

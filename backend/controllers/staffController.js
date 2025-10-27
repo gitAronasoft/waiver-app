@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 
 /**
  * Authenticates staff member and returns JWT token
@@ -133,26 +134,75 @@ const forgetPassword = async (req, res) => {
       });
     }
 
-    // Generate password reset token (expires in 1 hour)
-    const resetToken = jwt.sign(
-      { id: staff[0].id, email },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
+    const user = staff[0];
+    const encodedId = Buffer.from(user.id.toString()).toString('base64');
+    const encodedEmail = Buffer.from(email).toString('base64');
+    const resetBase = process.env.REACT_LINK_BASE || 'http://localhost:3000';
+    const resetLink = `${resetBase}/admin/reset-password?id=${encodedId}&email=${encodedEmail}`;
 
-    // Development mode logging
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[DEV] Password reset token for ${email}: ${resetToken}`);
-    }
+    // Send password reset email
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      },
+      tls: { rejectUnauthorized: false }
+    });
 
-    // TODO: Send email with reset link when email service is configured
-    // await sendPasswordResetEmail(email, resetToken);
+    const htmlTemplate = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Reset Your Admin Password</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 0; margin: 0;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td align="center" style="padding: 40px 0;">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #fff; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                <tr>
+                  <td style="background-color: #002244; color: white; padding: 20px; text-align: center;">
+                    <h2>Skate & Play Admin Portal</h2>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 30px;">
+                    <p>Hi ${user.name || "Admin"},</p>
+                    <p>We received a request to reset your admin portal password.</p>
+                    <p style="text-align: center; margin: 30px 0;">
+                      <a href="${resetLink}" style="background-color: #007bff; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px;">Reset Your Password</a>
+                    </p>
+                    <p>If you didn't request this, you can safely ignore this email.</p>
+                    <p>Stay safe,<br/>Skate & Play Admin Team</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center; background-color: #f1f1f1; padding: 10px; font-size: 12px; color: #888;">
+                    &copy; 2025 Skate & Play. All rights reserved.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: 'Reset Your Admin Password - Skate & Play',
+      html: htmlTemplate
+    });
 
     res.json({
       success: true,
-      message: 'Password reset link sent to email',
-      // Only expose token in development for testing
-      token: process.env.NODE_ENV === 'development' ? resetToken : undefined
+      message: 'Password reset link sent to email'
     });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
@@ -375,16 +425,16 @@ const getStaffById = async (req, res) => {
 };
 
 /**
- * Adds a new staff member
+ * Adds a new staff member and sends setup email
  */
 const addStaff = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, role } = req.body;
 
-    // Validate required fields
-    if (!name || !email || !password || !role) {
+    // Validate required fields (password is NOT required - sent via email)
+    if (!name || !email || !role) {
       return res.status(400).json({ 
-        error: 'Name, email, password, and role are required' 
+        error: 'Name, email, and role are required' 
       });
     }
 
@@ -392,13 +442,6 @@ const addStaff = async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ 
         error: 'Invalid email format' 
-      });
-    }
-
-    // Validate password strength
-    if (password.length < 6) {
-      return res.status(400).json({ 
-        error: 'Password must be at least 6 characters long' 
       });
     }
 
@@ -422,20 +465,114 @@ const addStaff = async (req, res) => {
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Insert new staff member
+    // Insert new staff member without password (will be set via email link)
     const [result] = await db.query(
-      'INSERT INTO staff (name, email, password, role, status, profile_image) VALUES (?, ?, ?, ?, 1, "")',
-      [name, email, hashedPassword, role]
+      'INSERT INTO staff (name, email, role, status, profile_image, password) VALUES (?, ?, ?, 0, "", "")',
+      [name, email, role]
     );
 
-    res.status(201).json({
-      success: true,
-      message: 'Staff member added successfully',
-      staffId: result.insertId
+    const insertedId = result.insertId;
+
+    // Generate password setup link
+    const encodedId = Buffer.from(insertedId.toString()).toString('base64');
+    const encodedEmail = Buffer.from(email).toString('base64');
+    const resetBase = process.env.REACT_LINK_BASE || 'http://localhost:3000';
+    const setupLink = `${resetBase}/admin/reset-password?id=${encodedId}&email=${encodedEmail}`;
+
+    console.log('📧 Preparing to send welcome email to:', email);
+    console.log('🔗 Setup link:', setupLink);
+    console.log('📮 SMTP Config:', {
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      user: process.env.SMTP_USER
     });
+
+    // Setup nodemailer
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      tls: { rejectUnauthorized: false },
+    });
+
+    // HTML email template with "Set Up Your Account" link
+    const htmlTemplate = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Welcome to Skate & Play</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 0; margin: 0;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td align="center" style="padding: 40px 0;">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #fff; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                <tr>
+                  <td style="background-color: #002244; color: white; padding: 20px; text-align: center;">
+                    <h2>Skate & Play Admin Portal</h2>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 30px;">
+                    <p>Hi ${name},</p>
+                    <p>You have been invited to join the Skate & Play admin portal as <b>${role == 1 ? "Admin" : "Staff"}</b>.</p>
+                    <p>Click the button below to set your account password:</p>
+                    <p style="text-align: center; margin: 30px 0;">
+                      <a href="${setupLink}" target="_blank" style="background-color: #f19d39; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px;">
+                        Set Up Your Account
+                      </a>
+                    </p>
+                    <p>Welcome aboard!<br/>Skate & Play Admin Team</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center; background-color: #f1f1f1; padding: 10px; font-size: 12px; color: #888;">
+                    &copy; 2025 Skate & Play. All rights reserved.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    try {
+      console.log('📤 Attempting to send email...');
+      const info = await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: email,
+        subject: "Set Up Your Skate & Play Admin Account",
+        html: htmlTemplate,
+      });
+
+      console.log('✅ Email sent successfully!', info.messageId);
+      res.status(201).json({
+        success: true,
+        message: 'Staff member added successfully. Setup email sent.',
+        staffId: insertedId
+      });
+    } catch (emailError) {
+      console.error("❌ Email sending failed:", {
+        error: emailError.message,
+        code: emailError.code,
+        command: emailError.command,
+        response: emailError.response,
+        responseCode: emailError.responseCode
+      });
+      // Rollback inserted staff
+      await db.query("DELETE FROM staff WHERE id = ?", [insertedId]);
+      return res.status(500).json({ 
+        error: 'Email sending failed. Staff not added.',
+        details: emailError.message
+      });
+    }
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
     console.error(`[${errorId}] Error adding staff:`, {
