@@ -208,7 +208,15 @@ const desktopColumns = [
       wrap: true
     },
 
-  { name: "Signed Date & Time", selector: row => row.signed_at, sortable: true, wrap: true, grow: 2, minWidth: "200px" },
+  { 
+    name: "Signed Date & Time", 
+    selector: row => row.signed_at, 
+    cell: row => <span>{row.signed_at || '-'}</span>,
+    sortable: true, 
+    wrap: true, 
+    grow: 2, 
+    minWidth: "200px" 
+  },
 
   { 
     name: "Status", 
@@ -279,7 +287,12 @@ const desktopColumns = [
   // Mobile columns
   const mobileColumns = [
     { name: "Name", selector: row => `${row.first_name} ${row.last_name}`, sortable: true },
-    { name: "Signed Date", selector: row => row.signed_at, sortable: true }
+    { 
+      name: "Signed Date", 
+      selector: row => row.signed_at, 
+      cell: row => <span>{row.signed_at || '-'}</span>,
+      sortable: true 
+    }
   ];
 
   // Expandable component for mobile

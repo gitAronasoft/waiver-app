@@ -24,7 +24,7 @@ const AdminFeedbackPage = () => {
     (async () => {
       try {
         const { data } = await axios.get(
-          `${BACKEND_URL}/api/waivers/getfeedback`
+          `${BACKEND_URL}/api/feedback/list`
         );
         const sorted = data.sort(
           (a, b) => new Date(b.created_at) - new Date(a.created_at)

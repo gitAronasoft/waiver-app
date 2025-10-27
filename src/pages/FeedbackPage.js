@@ -18,7 +18,7 @@ const feedbackId = query.get('feedbackId');
 
   useEffect(() => {
     axios
-      .get(`${BACKEND_URL}/api/waivers/rate/${userId}`)
+      .get(`${BACKEND_URL}/api/feedback/rate/${userId}`)
       .then((res) => {
         const { first_name, last_name } = res.data;
         setCustomerName(`${first_name} ${last_name}`);
@@ -31,21 +31,12 @@ const feedbackId = query.get('feedbackId');
     setLoading(true);
 
     try {
-      await axios.post(`${BACKEND_URL}/api/waivers/feedback`, {
-        userId,
-        feedbackId,
+      await axios.post(`${BACKEND_URL}/api/feedback/send-feedback`, {
+        user_id: userId,
+        rating: feedbackId,
         issue,
-        staffName,
-        message: feedback,
-      });
-
-      await axios.post(`${BACKEND_URL}/api/waivers/send-feedback`, {
-        userId,
-        feedbackId,
-        issue,
-        staffName,
+        staff_name: staffName,
         message: feedback
-       
       });
 
       toast.success('Feedback submitted successfully!');

@@ -795,7 +795,9 @@ const getWaiverDetails = async (req, res) => {
     );
 
     // Get waiver history for this customer with customer name and staff who verified
-    const [waiverHistory] = await db.query(
+    const { convertToEST } = require("../utils/time");
+    
+    const [waiverHistoryRaw] = await db.query(
       `
       SELECT 
         wf.id,
@@ -804,7 +806,6 @@ const getWaiverDetails = async (req, res) => {
         wf.verified_by_staff,
         wf.rules_accepted,
         CONCAT(c.first_name, ' ', c.last_name) as name,
-        DATE_FORMAT(CONVERT_TZ(wf.signed_at, '+00:00', 'America/New_York'), '%b %d, %Y at %h:%i %p') as date,
         CASE 
           WHEN wf.verified_by_staff > 0 THEN CONCAT('Marked by ', s.name)
           ELSE 'Not verified'
@@ -817,6 +818,12 @@ const getWaiverDetails = async (req, res) => {
     `,
       [customerId],
     );
+
+    // Format signed_at dates using backend timezone conversion
+    const waiverHistory = waiverHistoryRaw.map(w => ({
+      ...w,
+      date: w.signed_at ? convertToEST(w.signed_at, "MMM DD, YYYY [at] hh:mm A") : null
+    }));
 
     // Return data in the format expected by the frontend
     res.json({
@@ -916,6 +923,8 @@ const getUserHistory = async (req, res) => {
  */
 const getAllWaivers = async (req, res) => {
   try {
+    const { convertToEST } = require("../utils/time");
+
     const [rows] = await db.query(`
       SELECT 
         c.id AS customer_id,
@@ -925,7 +934,7 @@ const getAllWaivers = async (req, res) => {
         w.id AS waiver_id, 
         w.rating_email_sent,
         w.rating_sms_sent,
-        DATE_FORMAT(CONVERT_TZ(w.signed_at, '+00:00', 'America/New_York'), '%b %d, %Y at %h:%i %p') AS signed_at, 
+        w.signed_at, 
         w.verified_by_staff AS status,
         GROUP_CONCAT(
           CONCAT(m.first_name, '::', m.last_name) 
@@ -938,10 +947,11 @@ const getAllWaivers = async (req, res) => {
       ORDER BY w.signed_at DESC
     `);
 
-    // Parse minors into array
+    // Parse minors into array and format signed_at using backend timezone conversion
     const waivers = rows.map(r => ({
       ...r,
       id: r.customer_id,
+      signed_at: r.signed_at ? convertToEST(r.signed_at, "MMM DD, YYYY [at] hh:mm A") : null,
       minors: r.minors 
         ? r.minors.split('||').map(n => {
             const [first_name, last_name] = n.split('::');

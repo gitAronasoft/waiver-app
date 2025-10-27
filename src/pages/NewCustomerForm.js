@@ -515,6 +515,9 @@ function NewCustomerForm() {
                               handleMinorChange(index, "first_name", e.target.value)
                             }
                           />
+                          {errors[`minor_${index}_first_name`] && (
+                            <small className="text-danger d-block mt-1">{errors[`minor_${index}_first_name`]}</small>
+                          )}
                         </div>
                         <div className="flex-fill">
                           <input
@@ -526,6 +529,9 @@ function NewCustomerForm() {
                               handleMinorChange(index, "last_name", e.target.value)
                             }
                           />
+                          {errors[`minor_${index}_last_name`] && (
+                            <small className="text-danger d-block mt-1">{errors[`minor_${index}_last_name`]}</small>
+                          )}
                         </div>
                         <div className="flex-fill">
                           <input
@@ -536,6 +542,9 @@ function NewCustomerForm() {
                               handleMinorChange(index, "dob", e.target.value)
                             }
                           />
+                          {errors[`minor_${index}_dob`] && (
+                            <small className="text-danger d-block mt-1">{errors[`minor_${index}_dob`]}</small>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -545,13 +554,6 @@ function NewCustomerForm() {
                           Remove
                         </button>
                       </div>
-                      {(errors[`minor_${index}_first_name`] || errors[`minor_${index}_last_name`] || errors[`minor_${index}_dob`]) && (
-                        <div className="text-danger mt-1">
-                          {errors[`minor_${index}_first_name`] && <small className="d-block">{errors[`minor_${index}_first_name`]}</small>}
-                          {errors[`minor_${index}_last_name`] && <small className="d-block">{errors[`minor_${index}_last_name`]}</small>}
-                          {errors[`minor_${index}_dob`] && <small className="d-block">{errors[`minor_${index}_dob`]}</small>}
-                        </div>
-                      )}
                     </div>
                   ))}
                   <button
