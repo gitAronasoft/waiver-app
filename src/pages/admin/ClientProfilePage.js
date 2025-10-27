@@ -185,12 +185,16 @@ function formatPhone(phone = "") {
 }
 
 
-  if (isLoading) return <div className="text-center mt-5">Loading...</div>;
-  
-  if (!customer) return <div className="text-center mt-5">Customer not found</div>;
-
   return (
     <>
+      <Header />
+      
+      {isLoading ? (
+        <div className="text-center mt-5">Loading...</div>
+      ) : !customer ? (
+        <div className="text-center mt-5">Customer not found</div>
+      ) : (
+        <>
       {/* PDF Hidden Content */}
 <div style={{ position: "absolute", top: "-9999px", left: "-9999px" }}>
   
@@ -448,8 +452,6 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
 
 
       {/* Main UI */}
-      <Header />
-
       <div className="container">
         <div className="row">
           <div className="col-12 col-md-12 col-xl-7  mx-auto my-5">
@@ -521,6 +523,8 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
           </div>
         </div>
       </div>
+        </>
+      )}
     </>
   );
 }

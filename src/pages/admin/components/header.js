@@ -7,8 +7,18 @@ function Header() {
   const navigate = useNavigate();
   const currentPath = location.pathname;
 
-  const staff = JSON.parse(localStorage.getItem("staff"));
+  const [staff, setStaff] = React.useState(JSON.parse(localStorage.getItem("staff")));
   const dropdownRef = useRef(null); // Reference for dropdown
+
+  // Listen for profile updates
+  React.useEffect(() => {
+    const handleProfileUpdate = () => {
+      setStaff(JSON.parse(localStorage.getItem("staff")));
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -26,7 +36,7 @@ function Header() {
   <header className="header">
     <nav className="navbar navbar-expand-lg py-2">
       <div className="container-fluid">
-        
+
         {/* Logo */}
         <Link className="navbar-brand" to="/admin/home">
           <img
@@ -52,7 +62,7 @@ function Header() {
 
 
         <div className="d-flex d-lg-none align-items-center flex-wrap flex-lg-nowrap header-mobile-view ">
-            
+
             {/* Notification Bell */}
             {/* <img
               src="/assets/img/bell-icon.png"
@@ -66,7 +76,7 @@ function Header() {
               <img
                 src={
                   staff?.profile_image
-                    ? `${BACKEND_URL}/api/${staff.profile_image}`
+                    ? `${BACKEND_URL}/${staff.profile_image}`
                     : "/assets/img/Vector.png"
                 }
                 alt="profile"
@@ -95,10 +105,10 @@ function Header() {
                       src={
                         staff?.profile_image?.startsWith("http")
                           ? staff.profile_image
-                          : `${BACKEND_URL}/api/${staff.profile_image}`
+                          : `${BACKEND_URL}/${staff.profile_image}`
                       }
-                     
-                    
+
+
                     alt="profile"
                     style={{
                       width: "50px",
@@ -151,7 +161,7 @@ function Header() {
           {/* Right Side Icons */} 
           {/* <div className="d-flex align-items-center flex-wrap flex-lg-nowrap"> */}
             <div className="d-none d-lg-flex align-items-center flex-wrap flex-lg-nowrap">
-            
+
             {/* Notification Bell */}
             {/* <img
               src="/assets/img/bell-icon.png"
@@ -165,7 +175,7 @@ function Header() {
               <img
                 src={
                   staff?.profile_image
-                    ? `${BACKEND_URL}/api/${staff.profile_image}`
+                    ? `${BACKEND_URL}/${staff.profile_image}`
                     : "/assets/img/Vector.png"
                 }
                 alt="profile"
@@ -186,7 +196,7 @@ function Header() {
                   <img
                     src={
                       staff?.profile_image
-                        ? `${BACKEND_URL}/api/${staff.profile_image}`
+                        ? `${BACKEND_URL}/${staff.profile_image}`
                         : "/assets/img/Vector.png"
                     }
                     alt="profile"

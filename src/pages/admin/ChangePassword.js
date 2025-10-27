@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "../../utils/axios";
 import { toast } from "react-toastify";
 import Header from "./components/header";
 import { BACKEND_URL } from '../../config';
 
 function ChangePassword() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -12,8 +14,23 @@ function ChangePassword() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [staff, setStaff] = useState(null);
 
-  const staff = JSON.parse(localStorage.getItem("staff")); // id & email from logged-in user
+  useEffect(() => {
+    const staffData = localStorage.getItem("staff");
+    if (!staffData) {
+      toast.error("Please login to continue");
+      navigate("/admin/login");
+      return;
+    }
+    try {
+      setStaff(JSON.parse(staffData));
+    } catch (error) {
+      console.error("Error parsing staff data:", error);
+      toast.error("Session error. Please login again.");
+      navigate("/admin/login");
+    }
+  }, [navigate]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -37,6 +54,12 @@ function ChangePassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!staff) {
+      toast.error("Session expired. Please login again.");
+      navigate("/admin/login");
+      return;
+    }
 
     if (!form.currentPassword.trim()) {
       toast.error("Current password is required");
@@ -75,28 +98,43 @@ function ChangePassword() {
         `${BACKEND_URL}/api/staff/change-password`,
         {
           id: staff.id,
-          email: staff.email,
           currentPassword: form.currentPassword,
           newPassword: form.newPassword,
-          confirmPassword: form.confirmPassword,
         }
       );
 
-      toast.success(response.data.message || "Password updated successfully!");
+      toast.success(response.data.message || "Password changed successfully! Please login with your new password.");
 
-      // Optional: Update token if backend returns new one
-      if (response.data.token && response.data.staff) {
-        localStorage.setItem("token", response.data.token);
-        localStorage.setItem("staff", JSON.stringify(response.data.staff));
-      }
-
+      // Clear form
       setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+
+      // Clear session and redirect to login after password change
+      setTimeout(() => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("staff");
+        navigate("/admin/login");
+      }, 2000);
     } catch (err) {
-      toast.error(err.response?.data?.error || "Error changing password");
+      // Show error message without redirecting
+      const errorMessage = err.response?.data?.error || "Failed to change password. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  if (!staff) {
+    return (
+      <>
+        <Header />
+        <div className="container">
+          <div className="text-center mt-5">
+            <p>Loading...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

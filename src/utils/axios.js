@@ -21,7 +21,11 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    // Don't auto-redirect for password change endpoints - let component handle it
+    const isPasswordChangeEndpoint = error.config?.url?.includes('/change-password');
+
+    if (error.response?.status === 401 && !isPasswordChangeEndpoint) {
+      // Clear local storage and redirect to login
       localStorage.removeItem('token');
       localStorage.removeItem('staff');
       window.location.href = '/admin/login';

@@ -2,17 +2,19 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
-const db = require('./config/database');
+require('dotenv').config();
 
+const db = require('./config/database');
 const waiverRoutes = require('./routes/waiverRoutes');
 const authRoutes = require('./routes/authRoutes');
 const staffRoutes = require('./routes/staffRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 
-// Rating Email/SMS Scheduler - Uncomment when credentials are ready
-// require('./ratingEmailScheduler');
-
 const app = express();
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 const PORT = process.env.PORT || 8080;
 
 // CORS configuration - allows all origins for development
@@ -80,7 +82,7 @@ app.get('/api/test-db', async (req, res) => {
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
     console.error(`[${errorId}] Database connection test failed:`, error.message);
-    
+
     res.status(500).json({ 
       status: 'error', 
       error: 'Database connection failed',
@@ -105,7 +107,7 @@ app.use((req, res, next) => {
 // Must be defined after all routes and middleware
 app.use((err, req, res, next) => {
   const errorId = `ERR_${Date.now()}`;
-  
+
   // Log error details for debugging
   console.error(`[${errorId}] Server Error:`, {
     message: err.message,
@@ -114,10 +116,10 @@ app.use((err, req, res, next) => {
     method: req.method,
     body: req.body
   });
-  
+
   // Determine status code
   const statusCode = err.status || err.statusCode || 500;
-  
+
   // Send sanitized error response to client
   res.status(statusCode).json({
     error: err.message || 'Internal server error',

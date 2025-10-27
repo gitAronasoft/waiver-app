@@ -38,22 +38,22 @@ function AdminProfile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!admin.name.trim()) {
       toast.error("Name is required");
       return;
     }
-    
+
     if (!admin.email.trim()) {
       toast.error("Email is required");
       return;
     }
-    
+
     if (!validateEmail(admin.email)) {
       toast.error("Please enter a valid email address");
       return;
     }
-    
+
     setLoading(true);
 
     try {
@@ -66,24 +66,47 @@ function AdminProfile() {
         formData.append("profileImage", admin.profileImage);
       }
 
-      const res = await axios.post(
+      const token = localStorage.getItem("token");
+      const response = await fetch(
         `${BACKEND_URL}/api/staff/update-profile`,
-        formData,
         {
-          headers: { "Content-Type": "multipart/form-data" },
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
         }
       );
 
-      toast.success(res.data.message || "Profile updated successfully");
-      localStorage.setItem("staff", JSON.stringify(res.data.staff));
+      const data = await response.json();
 
-      // Update state with new data
-      setAdmin({
-        name: res.data.staff.name,
-        email: res.data.staff.email,
-        profileImage: res.data.staff.profile_image || "",
-      });
-      setPreview(null);
+      if (response.ok) {
+        toast.success("Profile updated successfully!");
+
+        // Update localStorage with new staff data
+        const updatedStaff = {
+          ...staff,
+          name: data.staff.name,
+          email: data.staff.email,
+          profile_image: data.staff.profile_image
+        };
+        localStorage.setItem("staff", JSON.stringify(updatedStaff));
+
+        // Update state properly
+        setAdmin({
+          name: data.staff.name,
+          email: data.staff.email,
+          profileImage: data.staff.profile_image
+        });
+
+        // Clear preview since we now have the server image
+        setPreview(null);
+
+        // Dispatch custom event to notify header to update
+        window.dispatchEvent(new Event('profileUpdated'));
+      } else {
+        toast.error(data.error || "Failed to update profile");
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to update profile");
     } finally {
@@ -105,7 +128,7 @@ function AdminProfile() {
                     src={
                       preview ||
                       (admin.profileImage && !(admin.profileImage instanceof File)
-                        ? `${BACKEND_URL}/api/${admin.profileImage}`
+                        ? `${BACKEND_URL}/${admin.profileImage}`
                         : "../assets/img/Vector.png")
                     }
                     alt="Profile"

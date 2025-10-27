@@ -114,6 +114,7 @@ function AddStaff() {
                     <option value="1">Admin</option>
                     <option value="2">Staff</option>
                   </select>
+                  <small className="text-muted">A secure password setup link will be sent to the staff member's email</small>
                 </div>
 
                 {/* Submit Button */}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from "react-router-dom";
-import axios from '../../utils/axios';
+import axios from 'axios';
 import { toast } from 'react-toastify';
 import { BACKEND_URL } from '../../config';
 
@@ -31,11 +31,6 @@ function LoginPage() {
 
     if (!password.trim()) {
       toast.error("Password is required");
-      return;
-    }
-
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters long");
       return;
     }
 

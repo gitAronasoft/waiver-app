@@ -345,14 +345,32 @@ const changePassword = async (req, res) => {
     // Validate required fields
     if (!id || !currentPassword || !newPassword) {
       return res.status(400).json({ 
-        error: 'Staff ID, current password, and new password are required' 
+        error: 'All fields are required' 
       });
     }
 
-    // Validate password strength
-    if (newPassword.length < 6) {
+    // Validate password strength (minimum 8 characters with uppercase, lowercase, number)
+    if (newPassword.length < 8) {
       return res.status(400).json({ 
-        error: 'New password must be at least 6 characters long' 
+        error: 'Password must be at least 8 characters long' 
+      });
+    }
+
+    if (!/[A-Z]/.test(newPassword)) {
+      return res.status(400).json({ 
+        error: 'Password must contain at least one uppercase letter' 
+      });
+    }
+
+    if (!/[a-z]/.test(newPassword)) {
+      return res.status(400).json({ 
+        error: 'Password must contain at least one lowercase letter' 
+      });
+    }
+
+    if (!/[0-9]/.test(newPassword)) {
+      return res.status(400).json({ 
+        error: 'Password must contain at least one number' 
       });
     }
 
@@ -392,6 +410,8 @@ const changePassword = async (req, res) => {
       [hashedPassword, id]
     );
 
+    console.log(`✅ Password changed successfully for staff ID: ${id}`);
+
     res.json({ 
       success: true, 
       message: 'Password changed successfully' 
@@ -404,7 +424,7 @@ const changePassword = async (req, res) => {
     });
     
     res.status(500).json({ 
-      error: 'Failed to change password',
+      error: 'Failed to change password. Please try again.',
       errorId 
     });
   }
@@ -713,7 +733,7 @@ const updateStaff = async (req, res) => {
 };
 
 /**
- * Updates staff member's own profile (name and email only)
+ * Updates staff member's own profile (name, email, and profile image)
  */
 const updateProfile = async (req, res) => {
   try {
@@ -745,11 +765,21 @@ const updateProfile = async (req, res) => {
       });
     }
 
+    // Build update query dynamically based on whether image was uploaded
+    let query = 'UPDATE staff SET name = ?, email = ?';
+    const params = [name, email];
+
+    if (req.file) {
+      const imagePath = `uploads/profile/${req.file.filename}`;
+      query += ', profile_image = ?';
+      params.push(imagePath);
+    }
+
+    query += ', updated_at = NOW() WHERE id = ?';
+    params.push(id);
+
     // Update profile
-    const [result] = await db.query(
-      'UPDATE staff SET name = ?, email = ?, updated_at = NOW() WHERE id = ?',
-      [name, email, id]
-    );
+    const [result] = await db.query(query, params);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ 
@@ -757,9 +787,16 @@ const updateProfile = async (req, res) => {
       });
     }
 
+    // Fetch updated staff data
+    const [updatedStaff] = await db.query(
+      'SELECT id, name, email, role, profile_image FROM staff WHERE id = ?',
+      [id]
+    );
+
     res.json({ 
       success: true, 
-      message: 'Profile updated successfully' 
+      message: 'Profile updated successfully',
+      staff: updatedStaff[0]
     });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
