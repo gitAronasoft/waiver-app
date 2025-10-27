@@ -13,17 +13,14 @@ function ResetPasswordForm() {
     confirmPassword: "",
   });
 
-  const [email, setEmail] = useState("");
-  const [id, setId] = useState("");
+  const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const encodedEmail = searchParams.get("email");
-    const encodedId = searchParams.get("id");
+    const resetToken = searchParams.get("token");
 
-    if (encodedEmail && encodedId) {
-      setEmail(atob(encodedEmail));
-      setId(atob(encodedId));
+    if (resetToken) {
+      setToken(resetToken);
     } else {
       toast.error("Invalid reset link.");
     }
@@ -31,26 +28,31 @@ function ResetPasswordForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (form.password !== form.confirmPassword) {
+      return toast.error("Passwords do not match");
+    }
+
+    if (form.password.length < 6) {
+      return toast.error("Password must be at least 6 characters long");
+    }
+
     setLoading(true);
 
     try {
       const response = await axios.post(`${BACKEND_URL}/api/staff/update-password`, {
-        email,
-        id,
-        password: form.password,
-        confirmPassword: form.confirmPassword,
+        token,
+        newPassword: form.password,
       });
 
-    
-        // ✅ Auto-login: store token and user info
-    localStorage.setItem("token", response.data.token);
-    localStorage.setItem("staff", JSON.stringify(response.data.staff));
+      toast.success(response.data.message || "Password updated successfully!");
 
-      toast.success(response.data || "Password updated successfully!");
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("staff", JSON.stringify(response.data.staff));
 
-    navigate("/admin/home"); // Redirect to home after login
+      navigate("/admin/home");
     } catch (err) {
-      toast.error(err.response?.data?.error || err.response?.data?.message || "Error resetting password");
+      toast.error(err.response?.data?.error || err.response?.data?.message || "Unable to reset your password. Please try again or request a new reset link.");
     } finally {
       setLoading(false);
     }

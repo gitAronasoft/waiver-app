@@ -782,7 +782,8 @@ const getWaiverDetails = async (req, res) => {
         wf.signed_at,
         wf.signature_image,
         wf.rules_accepted,
-        wf.verified_by_staff
+        wf.verified_by_staff,
+        wf.customer_id
       FROM waiver_forms wf
       JOIN customers c ON wf.customer_id = c.id
       WHERE wf.id = ?
@@ -797,15 +798,35 @@ const getWaiverDetails = async (req, res) => {
     }
 
     const waiver = waivers[0];
+    const customerId = waiver.customer_id;
 
+    // Get minors for this customer
     const [minors] = await db.query(
       "SELECT * FROM minors WHERE customer_id = ?",
-      [waiver.id],
+      [customerId],
     );
 
-    waiver.minors = minors;
+    // Get waiver history for this customer
+    const [waiverHistory] = await db.query(
+      `
+      SELECT 
+        wf.id,
+        wf.signed_at,
+        wf.verified_by_staff,
+        wf.rules_accepted
+      FROM waiver_forms wf
+      WHERE wf.customer_id = ?
+      ORDER BY wf.signed_at DESC
+    `,
+      [customerId],
+    );
 
-    res.json(waiver);
+    // Return data in the format expected by the frontend
+    res.json({
+      customer: waiver,
+      minors: minors,
+      waiverHistory: waiverHistory,
+    });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
     console.error(`[${errorId}] Error fetching waiver details:`, {

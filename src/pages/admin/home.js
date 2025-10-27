@@ -19,7 +19,7 @@ function HomePage() {
       setCustomers(res.data);
     } catch (err) {
       console.error('Error fetching customers:', err);
-      toast.error('Failed to load waivers');
+      toast.error('Unable to load waivers. Please refresh the page.');
     } finally {
       setLoading(false);
     }

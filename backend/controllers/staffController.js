@@ -103,7 +103,7 @@ const login = async (req, res) => {
 
 /**
  * Initiates password reset for staff member
- * Generates JWT token for password reset
+ * Generates secure token and sends reset link via email
  */
 const forgetPassword = async (req, res) => {
   try {
@@ -112,14 +112,14 @@ const forgetPassword = async (req, res) => {
     // Validate email
     if (!email) {
       return res.status(400).json({ 
-        error: 'Email is required' 
+        error: 'Please enter your email address' 
       });
     }
 
     // Validate email format
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ 
-        error: 'Invalid email format' 
+        error: 'Please enter a valid email address' 
       });
     }
 
@@ -130,15 +130,32 @@ const forgetPassword = async (req, res) => {
 
     if (staff.length === 0) {
       return res.status(404).json({ 
-        error: 'Email not found' 
+        error: 'No account found with this email address' 
       });
     }
 
     const user = staff[0];
-    const encodedId = Buffer.from(user.id.toString()).toString('base64');
-    const encodedEmail = Buffer.from(email).toString('base64');
+    
+    // Generate secure random token
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    
+    // Set token expiry to 24 hours from now
+    const tokenExpiry = new Date();
+    tokenExpiry.setHours(tokenExpiry.getHours() + 24);
+
+    // Update staff with reset token
+    await db.query(
+      'UPDATE staff SET reset_token = ?, token_expiry = ? WHERE id = ?',
+      [resetToken, tokenExpiry, user.id]
+    );
+
     const resetBase = process.env.REACT_LINK_BASE || 'http://localhost:3000';
-    const resetLink = `${resetBase}/admin/reset-password?id=${encodedId}&email=${encodedEmail}`;
+    const resetLink = `${resetBase}/admin/reset-password?token=${resetToken}`;
+
+    console.log('🔐 Password reset requested for:', email);
+    console.log('🔗 Reset link:', resetLink);
+    console.log('⏰ Token expires:', tokenExpiry.toISOString());
 
     // Send password reset email
     const transporter = nodemailer.createTransport({
@@ -165,23 +182,26 @@ const forgetPassword = async (req, res) => {
             <td align="center" style="padding: 40px 0;">
               <table width="600" cellpadding="0" cellspacing="0" style="background-color: #fff; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
                 <tr>
-                  <td style="background-color: #002244; color: white; padding: 20px; text-align: center;">
-                    <h2>Skate & Play Admin Portal</h2>
+                  <td style="background-color: #002244; color: white; padding: 30px 20px; text-align: center;">
+                    <img src="${resetBase}/assets/img/SKATE_AND_PLAY_V08_Full_Transparency (2) 1.png" alt="Skate & Play Logo" style="max-width: 200px; height: auto; margin-bottom: 10px;" />
+                    <h2 style="margin: 10px 0 0 0;">Admin Portal</h2>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 30px;">
+                    <h3 style="color: #002244; margin-top: 0;">Password Reset Request</h3>
                     <p>Hi ${user.name || "Admin"},</p>
-                    <p>We received a request to reset your admin portal password.</p>
+                    <p>We received a request to reset your admin portal password. Click the button below to create a new password:</p>
                     <p style="text-align: center; margin: 30px 0;">
-                      <a href="${resetLink}" style="background-color: #007bff; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px;">Reset Your Password</a>
+                      <a href="${resetLink}" target="_blank" style="background-color: #007bff; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold; display: inline-block;">Reset Your Password</a>
                     </p>
-                    <p>If you didn't request this, you can safely ignore this email.</p>
-                    <p>Stay safe,<br/>Skate & Play Admin Team</p>
+                    <p style="color: #666; font-size: 14px;"><strong>Important:</strong> This link will expire in 24 hours for security reasons.</p>
+                    <p>If you didn't request this password reset, please ignore this email or contact our support team immediately.</p>
+                    <p style="margin-top: 30px;">Stay safe,<br/><strong>Skate & Play Admin Team</strong></p>
                   </td>
                 </tr>
                 <tr>
-                  <td style="text-align: center; background-color: #f1f1f1; padding: 10px; font-size: 12px; color: #888;">
+                  <td style="text-align: center; background-color: #f1f1f1; padding: 15px; font-size: 12px; color: #888;">
                     &copy; 2025 Skate & Play. All rights reserved.
                   </td>
                 </tr>
@@ -202,7 +222,7 @@ const forgetPassword = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Password reset link sent to email'
+      message: 'Password reset instructions have been sent to your email address'
     });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
@@ -212,14 +232,14 @@ const forgetPassword = async (req, res) => {
     });
     
     res.status(500).json({ 
-      error: 'Failed to process password reset request',
+      error: 'Failed to send password reset email. Please try again.',
       errorId 
     });
   }
 };
 
 /**
- * Updates password using reset token
+ * Updates password using reset token from database
  */
 const updatePassword = async (req, res) => {
   try {
@@ -239,39 +259,68 @@ const updatePassword = async (req, res) => {
       });
     }
 
-    // Verify and decode JWT token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (jwtError) {
-      if (jwtError.name === 'TokenExpiredError') {
-        return res.status(401).json({ 
-          error: 'Password reset link has expired' 
-        });
-      }
+    // Query staff table using reset_token
+    const [staff] = await db.query(
+      'SELECT id, name, email, role, token_expiry, profile_image FROM staff WHERE reset_token = ?',
+      [token]
+    );
+
+    // Check if token exists
+    if (staff.length === 0) {
       return res.status(401).json({ 
-        error: 'Invalid password reset link' 
+        error: 'Invalid or expired password reset link' 
+      });
+    }
+
+    const user = staff[0];
+
+    // Check if token has expired
+    const now = new Date();
+    const tokenExpiry = new Date(user.token_expiry);
+    
+    if (now > tokenExpiry) {
+      return res.status(401).json({ 
+        error: 'Password reset link has expired. Please request a new one.' 
       });
     }
 
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password in database
+    // Update password, clear reset token, set status to active
     const [result] = await db.query(
-      'UPDATE staff SET password = ?, updated_at = NOW() WHERE id = ?',
-      [hashedPassword, decoded.id]
+      'UPDATE staff SET password = ?, reset_token = NULL, token_expiry = NULL, status = 1, updated_at = NOW() WHERE id = ?',
+      [hashedPassword, user.id]
     );
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ 
-        error: 'Staff member not found' 
+        error: 'Failed to update password. Please try again.' 
       });
     }
 
+    // Generate JWT token for auto-login
+    const authToken = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    console.log('✅ Password reset successful for:', user.email);
+    console.log('🔐 Auto-login token generated');
+
+    // Return token and staff info for auto-login
     res.json({ 
       success: true, 
-      message: 'Password updated successfully' 
+      message: 'Password updated successfully',
+      token: authToken,
+      staff: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profile_image: user.profile_image
+      }
     });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
@@ -280,7 +329,7 @@ const updatePassword = async (req, res) => {
     });
     
     res.status(500).json({ 
-      error: 'Failed to update password',
+      error: 'Failed to update password. Please try again.',
       errorId 
     });
   }
@@ -425,7 +474,7 @@ const getStaffById = async (req, res) => {
 };
 
 /**
- * Adds a new staff member and sends setup email
+ * Adds a new staff member and sends setup email with secure token
  */
 const addStaff = async (req, res) => {
   try {
@@ -443,15 +492,7 @@ const addStaff = async (req, res) => {
       return res.status(400).json({ 
         error: 'Invalid email format' 
       });
-    }
-
-    // Validate role
-    const validRoles = ['admin', 'manager', 'staff'];
-    if (!validRoles.includes(role.toLowerCase())) {
-      return res.status(400).json({ 
-        error: 'Invalid role. Must be admin, manager, or staff' 
-      });
-    }
+    } 
 
     // Check if email already exists
     const [existing] = await db.query(
@@ -461,31 +502,33 @@ const addStaff = async (req, res) => {
 
     if (existing.length > 0) {
       return res.status(409).json({ 
-        error: 'Email already exists' 
+        error: 'This email is already registered. Please use a different email address.' 
       });
     }
 
-    // Insert new staff member without password (will be set via email link)
+    // Generate secure random token for password setup
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    
+    // Set token expiry to 24 hours from now
+    const tokenExpiry = new Date();
+    tokenExpiry.setHours(tokenExpiry.getHours() + 24);
+
+    // Insert new staff member with reset token
     const [result] = await db.query(
-      'INSERT INTO staff (name, email, role, status, profile_image, password) VALUES (?, ?, ?, 0, "", "")',
-      [name, email, role]
+      'INSERT INTO staff (name, email, role, status, profile_image, password, reset_token, token_expiry) VALUES (?, ?, ?, 0, "", "", ?, ?)',
+      [name, email, role, resetToken, tokenExpiry]
     );
 
     const insertedId = result.insertId;
 
-    // Generate password setup link
-    const encodedId = Buffer.from(insertedId.toString()).toString('base64');
-    const encodedEmail = Buffer.from(email).toString('base64');
+    // Generate secure password setup link with token only
     const resetBase = process.env.REACT_LINK_BASE || 'http://localhost:3000';
-    const setupLink = `${resetBase}/admin/reset-password?id=${encodedId}&email=${encodedEmail}`;
+    const setupLink = `${resetBase}/admin/reset-password?token=${resetToken}`;
 
     console.log('📧 Preparing to send welcome email to:', email);
     console.log('🔗 Setup link:', setupLink);
-    console.log('📮 SMTP Config:', {
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      user: process.env.SMTP_USER
-    });
+    console.log('⏰ Token expires:', tokenExpiry.toISOString());
 
     // Setup nodemailer
     const transporter = nodemailer.createTransport({
@@ -499,7 +542,7 @@ const addStaff = async (req, res) => {
       tls: { rejectUnauthorized: false },
     });
 
-    // HTML email template with "Set Up Your Account" link
+    // HTML email template with logo and "Set Up Your Account" link
     const htmlTemplate = `
       <!DOCTYPE html>
       <html>
@@ -513,25 +556,28 @@ const addStaff = async (req, res) => {
             <td align="center" style="padding: 40px 0;">
               <table width="600" cellpadding="0" cellspacing="0" style="background-color: #fff; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
                 <tr>
-                  <td style="background-color: #002244; color: white; padding: 20px; text-align: center;">
-                    <h2>Skate & Play Admin Portal</h2>
+                  <td style="background-color: #002244; color: white; padding: 30px 20px; text-align: center;">
+                    <img src="${resetBase}/assets/img/SKATE_AND_PLAY_V08_Full_Transparency (2) 1.png" alt="Skate & Play Logo" style="max-width: 200px; height: auto; margin-bottom: 10px;" />
+                    <h2 style="margin: 10px 0 0 0;">Admin Portal</h2>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 30px;">
-                    <p>Hi ${name},</p>
+                    <h3 style="color: #002244; margin-top: 0;">Welcome to the Team, ${name}!</h3>
                     <p>You have been invited to join the Skate & Play admin portal as <b>${role == 1 ? "Admin" : "Staff"}</b>.</p>
-                    <p>Click the button below to set your account password:</p>
+                    <p>To get started, please set up your account password by clicking the button below:</p>
                     <p style="text-align: center; margin: 30px 0;">
-                      <a href="${setupLink}" target="_blank" style="background-color: #f19d39; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-size: 16px;">
+                      <a href="${setupLink}" target="_blank" style="background-color: #f19d39; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold; display: inline-block;">
                         Set Up Your Account
                       </a>
                     </p>
-                    <p>Welcome aboard!<br/>Skate & Play Admin Team</p>
+                    <p style="color: #666; font-size: 14px;"><strong>Important:</strong> This link will expire in 24 hours for security reasons.</p>
+                    <p>If you did not expect this invitation, please ignore this email or contact our support team.</p>
+                    <p style="margin-top: 30px;">Welcome aboard!<br/><strong>Skate & Play Admin Team</strong></p>
                   </td>
                 </tr>
                 <tr>
-                  <td style="text-align: center; background-color: #f1f1f1; padding: 10px; font-size: 12px; color: #888;">
+                  <td style="text-align: center; background-color: #f1f1f1; padding: 15px; font-size: 12px; color: #888;">
                     &copy; 2025 Skate & Play. All rights reserved.
                   </td>
                 </tr>
@@ -548,14 +594,14 @@ const addStaff = async (req, res) => {
       const info = await transporter.sendMail({
         from: process.env.SMTP_USER,
         to: email,
-        subject: "Set Up Your Skate & Play Admin Account",
+        subject: "Welcome to Skate & Play - Set Up Your Account",
         html: htmlTemplate,
       });
 
       console.log('✅ Email sent successfully!', info.messageId);
       res.status(201).json({
         success: true,
-        message: 'Staff member added successfully. Setup email sent.',
+        message: 'Staff member added successfully! A setup email has been sent to their email address.',
         staffId: insertedId
       });
     } catch (emailError) {
@@ -569,7 +615,7 @@ const addStaff = async (req, res) => {
       // Rollback inserted staff
       await db.query("DELETE FROM staff WHERE id = ?", [insertedId]);
       return res.status(500).json({ 
-        error: 'Email sending failed. Staff not added.',
+        error: 'Failed to send setup email. Please check the email address and try again.',
         details: emailError.message
       });
     }
@@ -581,7 +627,7 @@ const addStaff = async (req, res) => {
     });
     
     res.status(500).json({ 
-      error: 'Failed to add staff member',
+      error: 'Failed to add staff member. Please try again.',
       errorId 
     });
   }

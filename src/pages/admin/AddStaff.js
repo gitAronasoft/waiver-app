@@ -7,7 +7,7 @@ import { BACKEND_URL } from '../../config';
 
 function AddStaff() {
     const navigate = useNavigate();
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "" });
+  const [form, setForm] = useState({ name: "", email: "", role: "" });
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -34,14 +34,6 @@ function AddStaff() {
       return toast.error("Please enter a valid email address");
     }
     
-    if (!form.password.trim()) {
-      return toast.error("Password is required");
-    }
-    
-    if (form.password.length < 6) {
-      return toast.error("Password must be at least 6 characters long");
-    }
-    
     if (!form.role) {
       return toast.error("Please select a role");
     }
@@ -50,11 +42,11 @@ function AddStaff() {
 
     try {
       const res = await axios.post(`${BACKEND_URL}/api/staff/addstaff`, form);
-      toast.success(res.data.message || "Staff added successfully");
+      toast.success(res.data.message || "Staff added successfully! A setup email has been sent.");
       navigate("/admin/staff-list");
-      setForm({ name: "", email: "", password: "", role: "" });
+      setForm({ name: "", email: "", role: "" });
     } catch (error) {
-      toast.error(error.response?.data?.error || "Failed to add staff");
+      toast.error(error.response?.data?.error || "Unable to add staff member. Please check the details and try again.");
     } finally {
       setLoading(false);
     }
@@ -105,20 +97,7 @@ function AddStaff() {
                     placeholder="Enter staff email"
                     disabled={loading}
                   />
-                </div>
-
-                {/* Password Field */}
-                <div className="mb-3">
-                  <label className="form-label">Password</label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={form.password}
-                    onChange={handleChange}
-                    className="form-control"
-                    placeholder="Enter password (min 6 characters)"
-                    disabled={loading}
-                  />
+                  <small className="text-muted">An account setup email will be sent to this address</small>
                 </div>
 
                 {/* Role Select Box */}

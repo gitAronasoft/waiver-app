@@ -1,31 +1,25 @@
 import React, { useEffect, useState } from "react";
 import axios from "../../utils/axios";
-import $ from "jquery";
-
-// DataTables core & CSS
-import "datatables.net-dt/js/dataTables.dataTables";
-import "datatables.net-dt/css/dataTables.dataTables.css";
-
-import "datatables.net-responsive-dt/js/responsive.dataTables";
-import "datatables.net-responsive-dt/css/responsive.dataTables.css";
-
 import Header from "./components/header";
 import { convertToEST } from "../../utils/time";
+import DataTable from 'react-data-table-component';
+import Skeleton from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
 import { BACKEND_URL } from '../../config';
 
 const AdminFeedbackPage = () => {
   const [feedbackList, setFeedbackList] = useState([]);
+  const [filtered, setFiltered] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // Escape HTML safely for tooltip
-  const escapeHtml = (str) =>
-    String(str).replace(/[&<>"']/g, (s) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[
-        s
-      ])
-    );
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-  // Fetch feedback from backend
   useEffect(() => {
     (async () => {
       try {
@@ -35,8 +29,8 @@ const AdminFeedbackPage = () => {
         const sorted = data.sort(
           (a, b) => new Date(b.created_at) - new Date(a.created_at)
         );
-        console.log("Feedback data:", sorted); // Debug
         setFeedbackList(sorted);
+        setFiltered(sorted);
       } catch (err) {
         console.error("Failed to fetch feedback", err);
       } finally {
@@ -45,100 +39,146 @@ const AdminFeedbackPage = () => {
     })();
   }, []);
 
-  // Initialize DataTable after feedback loads
   useEffect(() => {
-    if (loading || feedbackList.length === 0) return;
-
-    if ($.fn.DataTable.isDataTable("#feedbackTable")) {
-      $("#feedbackTable").DataTable().destroy();
-    }
-
-    setTimeout(() => {
-      $("#feedbackTable").DataTable({
-        data: feedbackList,
-        responsive: true,
-        paging: true,
-        searching: true,
-        ordering: true,
-        autoWidth: false,
-        columns: [
-          {
-            data: null,
-            render: (data, type, row, meta) => meta.row + 1, // row index
-          },
-          {
-            data: null,
-            render: (row) => `${row.first_name || ""} ${row.last_name || ""}`,
-          },
-          { data: "rating", defaultContent: "-" },
-          { data: "issue", defaultContent: "-" },
-          { data: "staff_name", defaultContent: "-" },
-          // {
-          //   data: "message",
-          //   render: (data, type) => {
-          //     if (!data) return "-";
-          //     if (type !== "display") return data;
-
-          //     const max = 80;
-          //     const full = escapeHtml(data);
-          //     const shown =
-          //       data.length > max ? escapeHtml(data.slice(0, max)) + "…" : full;
-
-          //     return `<span title="${full}">${shown}</span>`;
-          //   },
-          // },
-            {
-                data: "message",
-                render: (data, type) => {
-                  if (!data) return "-";
-                  if (type !== "display") return data;
-
-                  const full = escapeHtml(data);
-                  return `<span title="${full}">${full}</span>`; // ✅ show everything
-                },
-              },
-            {
-            data: "created_at",
-            render: (data) => (data ? convertToEST(data) : "-"),
-          },
-        ],
+    if (search.trim() === "") {
+      setFiltered(feedbackList);
+    } else {
+      const lowerSearch = search.toLowerCase();
+      const filtered = feedbackList.filter(f => {
+        const fullName = `${f.first_name || ""} ${f.last_name || ""}`.toLowerCase();
+        const staffName = (f.staff_name || "").toLowerCase();
+        const message = (f.message || "").toLowerCase();
+        const issue = (f.issue || "").toLowerCase();
+        return fullName.includes(lowerSearch) || 
+               staffName.includes(lowerSearch) || 
+               message.includes(lowerSearch) ||
+               issue.includes(lowerSearch);
       });
+      setFiltered(filtered);
+    }
+  }, [search, feedbackList]);
 
-      $(".dt-search input[type='search']").attr(
-        "placeholder",
-        "Search feedback..."
-      );
-    }, 0);
-  }, [loading, feedbackList]);
+  const desktopColumns = [
+    { name: "#", cell: (row, index) => index + 1, width: "60px", sortable: true },
+    {
+      name: "Customer",
+      selector: row => `${row.first_name || ""} ${row.last_name || ""}`,
+      sortable: true,
+      cell: row => (
+        <span title={`${row.first_name || ""} ${row.last_name || ""}`}>
+          {row.first_name || ""} {row.last_name || ""}
+        </span>
+      )
+    },
+    {
+      name: "Rating",
+      selector: row => row.rating || "-",
+      sortable: true,
+      width: "100px"
+    },
+    {
+      name: "Issue",
+      selector: row => row.issue || "-",
+      sortable: true,
+      cell: row => <span title={row.issue || "-"}>{row.issue || "-"}</span>
+    },
+    {
+      name: "Staff Name",
+      selector: row => row.staff_name || "-",
+      sortable: true,
+      cell: row => <span title={row.staff_name || "-"}>{row.staff_name || "-"}</span>
+    },
+    {
+      name: "Message",
+      selector: row => row.message || "-",
+      sortable: true,
+      cell: row => <span title={row.message || "-"}>{row.message || "-"}</span>,
+      wrap: true,
+      grow: 2
+    },
+    {
+      name: "Date",
+      selector: row => row.created_at ? convertToEST(row.created_at) : "-",
+      sortable: true,
+      wrap: true,
+      minWidth: "150px"
+    }
+  ];
+
+  const mobileColumns = [
+    {
+      name: "Customer",
+      selector: row => `${row.first_name || ""} ${row.last_name || ""}`,
+      sortable: true
+    },
+    {
+      name: "Rating",
+      selector: row => row.rating || "-",
+      sortable: true
+    }
+  ];
+
+  const ExpandedComponent = ({ data }) => (
+    <div style={{ padding: "10px 20px" }}>
+      <div>
+        <strong>Issue:</strong> {data.issue || "-"}
+      </div>
+      <div style={{ marginTop: "10px" }}>
+        <strong>Staff Name:</strong> {data.staff_name || "-"}
+      </div>
+      <div style={{ marginTop: "10px" }}>
+        <strong>Message:</strong> {data.message || "-"}
+      </div>
+      <div style={{ marginTop: "10px" }}>
+        <strong>Date:</strong> {data.created_at ? convertToEST(data.created_at) : "-"}
+      </div>
+    </div>
+  );
 
   return (
     <>
       <Header />
       <div className="container mt-5">
-        <h5 className="h5-heading my-3 pb-3">Customer Feedback</h5>
+        <div className="row">
+          <div className="col-md-12">
 
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <table
-            id="feedbackTable"
-            className="display responsive"
-            style={{ width: "100%" }}
-          >
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Customer</th>
-                <th>Rating</th>
-                <th>Issue</th>
-                <th>Staff Name</th>
-                <th>Message</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody />
-          </table>
-        )}
+            <h5 className="h5-heading my-3 pb-3">Customer Feedback</h5>
+
+            <div className="d-flex flex-wrap justify-content-between mb-4">
+              <div className="custom-search-box mb-2 custom-search-mobile-view">
+                <span className="search-icon">
+                  <img src="/assets/img/solar_magnifer-outline.png" alt="Search" />
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search feedback..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {loading ? (
+              <Skeleton height={50} count={5} />
+            ) : (
+              <div className="history-table">
+                <DataTable
+                  columns={isMobile ? mobileColumns : desktopColumns}
+                  data={filtered}
+                  pagination
+                  responsive
+                  highlightOnHover
+                  noHeader
+                  keyField="id"
+                  expandableRows={isMobile}
+                  expandableRowsComponent={ExpandedComponent}
+                />
+              </div>
+            )}
+
+          </div>
+        </div>
       </div>
     </>
   );
