@@ -7,6 +7,12 @@ This project is a full-stack waiver management system designed for Skate & Play.
 I prefer simple language in explanations. I want iterative development, with frequent, small updates rather than large, infrequent ones. Please ask before making major changes or architectural decisions. Do not make changes to the `Backend-old` folder or any duplicate components.
 
 ## Recent Changes (October 27, 2025)
+- **Customer History Preservation Bug Fix**: Fixed critical bug where "New Waiver" signups with existing phone numbers were overwriting customer data. The system now:
+  - Preserves original customer information (name, DOB, address) when phone number already exists
+  - Does not delete or modify existing minors when creating new waivers
+  - Creates new waiver_form entries without destroying history
+  - Allows users to see complete waiver history when logging in via "Existing Customer"
+  - Note: Minors are linked to customer accounts (not individual waivers) and should be managed via "Existing Customer" flow
 - **Signature Page Data Loading**: Fixed `getMinors` endpoint to return complete customer information (first_name, last_name, dob, address, etc.) along with minors, resolving issue where signature page showed blank fields after OTP verification.
 - **Minor Management Functionality**: Implemented complete add/update/delete operations for minors in `saveSignature` endpoint. The system now properly:
   - Adds new minors to the database

@@ -64,27 +64,13 @@ const createWaiver = async (req, res) => {
     );
 
     if (existingCustomer.length > 0) {
+      // Existing customer - preserve their original data
       customerId = existingCustomer[0].id;
-
-      await connection.query(
-        `UPDATE customers SET 
-          first_name = ?, last_name = ?, email = ?, 
-          dob = ?, address = ?, city = ?, province = ?, 
-          postal_code = ?, country_code = ?, updated_at = NOW()
-        WHERE id = ?`,
-        [
-          first_name,
-          last_name,
-          email,
-          dob,      
-          address,
-          city,
-          province,
-          postal_code,
-          country_code,
-          customerId,
-        ],
-      );
+      console.log(`📝 Found existing customer (ID: ${customerId}) - preserving original customer data and creating new waiver`);
+      
+      // Do NOT update customer data - preserve history
+      // Do NOT touch minors - they belong to the customer, not individual waivers
+      // Just create a new waiver_form entry below
     } else {
       const [result] = await connection.query(
         `INSERT INTO customers 
@@ -105,28 +91,28 @@ const createWaiver = async (req, res) => {
         ],
       );
       customerId = result.insertId;
+      
+      // Insert minors for NEW customers only
+      if (minors && minors.length > 0) {
+        const minorValues = minors.map((minor) => [
+          customerId,
+          minor.first_name,
+          minor.last_name,
+          minor.dob,
+          1,
+        ]);
+
+        await connection.query(
+          "INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?",
+          [minorValues],
+        );
+        console.log(`✅ Added ${minors.length} minor(s) for new customer ${customerId}`);
+      }
     }
-
-    // Delete existing minors for this customer
-    await connection.query("DELETE FROM minors WHERE customer_id = ?", [
-      customerId,
-    ]);
-
-    // Batch insert minors if any
-    if (minors && minors.length > 0) {
-      const minorValues = minors.map((minor) => [
-        customerId,
-        minor.first_name,
-        minor.last_name,
-        minor.dob,
-        1,
-      ]);
-
-      await connection.query(
-        "INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?",
-        [minorValues],
-      );
-    }
+    
+    // For existing customers: Do NOT delete or modify minors
+    // Minors are linked to customer_id (not waiver_id), so they persist across all waivers
+    // If customer wants to update minors, they should use "Existing Customer" flow
 
     // Create waiver form entry
     const [waiverResult] = await connection.query(
@@ -644,11 +630,13 @@ const getAllCustomers = async (req, res) => {
   try {
     // Optimized query to fetch all data in a single query using LEFT JOIN
     // GROUP_CONCAT aggregates minors data to avoid N+1 query problem
+    // Filter out verified waivers (only show waivers that need verification)
     const [waivers] = await db.query(`
       SELECT 
         c.id,
         c.first_name,
         c.last_name,
+        c.dob,
         c.cell_phone as phone_number,
         c.email,
         c.address,
@@ -669,8 +657,8 @@ const getAllCustomers = async (req, res) => {
       FROM waiver_forms wf
       JOIN customers c ON wf.customer_id = c.id
       LEFT JOIN minors m ON m.customer_id = c.id AND m.status = 1
-      WHERE wf.completed = 1
-      GROUP BY wf.id, c.id, c.first_name, c.last_name, c.cell_phone, c.email, 
+      WHERE wf.completed = 1 AND (wf.verified_by_staff IS NULL OR wf.verified_by_staff = 0)
+      GROUP BY wf.id, c.id, c.first_name, c.last_name, c.dob, c.cell_phone, c.email, 
                c.address, c.city, c.province, c.postal_code, wf.signed_at, 
                wf.verified_by_staff, wf.rating_email_sent, wf.rating_sms_sent, wf.completed
       ORDER BY wf.created_at DESC
@@ -806,15 +794,24 @@ const getWaiverDetails = async (req, res) => {
       [customerId],
     );
 
-    // Get waiver history for this customer
+    // Get waiver history for this customer with customer name and staff who verified
     const [waiverHistory] = await db.query(
       `
       SELECT 
         wf.id,
         wf.signed_at,
+        wf.signature_image,
         wf.verified_by_staff,
-        wf.rules_accepted
+        wf.rules_accepted,
+        CONCAT(c.first_name, ' ', c.last_name) as name,
+        DATE_FORMAT(CONVERT_TZ(wf.signed_at, '+00:00', 'America/New_York'), '%b %d, %Y at %h:%i %p') as date,
+        CASE 
+          WHEN wf.verified_by_staff > 0 THEN CONCAT('Marked by ', s.name)
+          ELSE 'Not verified'
+        END as markedBy
       FROM waiver_forms wf
+      JOIN customers c ON wf.customer_id = c.id
+      LEFT JOIN staff s ON wf.verified_by_staff = s.id
       WHERE wf.customer_id = ?
       ORDER BY wf.signed_at DESC
     `,
@@ -928,7 +925,7 @@ const getAllWaivers = async (req, res) => {
         w.id AS waiver_id, 
         w.rating_email_sent,
         w.rating_sms_sent,
-        DATE_FORMAT(w.signed_at, '%b %d, %Y at %h:%i %p') AS signed_at, 
+        DATE_FORMAT(CONVERT_TZ(w.signed_at, '+00:00', 'America/New_York'), '%b %d, %Y at %h:%i %p') AS signed_at, 
         w.verified_by_staff AS status,
         GROUP_CONCAT(
           CONCAT(m.first_name, '::', m.last_name) 

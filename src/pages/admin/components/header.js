@@ -92,23 +92,16 @@ function Header() {
                 }}
               />
 
-              <ul className="dropdown-menu dropdown-menu-end">
-                <li className="text-center px-3">
-                  {/* <img
-                    src={
-                      staff?.profile_image
-                        ? `${BACKEND_URL}/api/${staff.profile_image}`
-                        : "/assets/img/Vector.png"
-                    } */}
-
+              <ul className="dropdown-menu dropdown-menu-end" style={{ padding: "10px 0", minWidth: "200px" }}>
+                <li className="text-center px-3" style={{ paddingBottom: "10px", borderBottom: "1px solid #e0e0e0", marginBottom: "10px" }}>
                     <img
                       src={
                         staff?.profile_image?.startsWith("http")
                           ? staff.profile_image
-                          : `${BACKEND_URL}/${staff.profile_image}`
+                          : staff?.profile_image
+                          ? `${BACKEND_URL}/${staff.profile_image}`
+                          : "/assets/img/Vector.png"
                       }
-
-
                     alt="profile"
                     style={{
                       width: "50px",
@@ -118,11 +111,11 @@ function Header() {
                       objectFit: "cover",
                     }}
                   />
-                  <h6>{staff?.name || "Admin User"}</h6>
+                  <h6 style={{ margin: 0, fontSize: "14px", fontWeight: "600" }}>{staff?.name || "Admin User"}</h6>
                 </li>
-                <li><Link className="dropdown-item" to="/admin/change-password">Change Password</Link></li>
-                <li><Link className="dropdown-item" to="/admin/update-profile">Update Profile</Link></li>
-                <li><span className="dropdown-item" style={{ cursor: "pointer" }} onClick={handleLogout}>Sign Out</span></li>
+                <li style={{ margin: "5px 0" }}><Link className="dropdown-item" to="/admin/change-password" style={{ padding: "8px 16px" }}>Change Password</Link></li>
+                <li style={{ margin: "5px 0" }}><Link className="dropdown-item" to="/admin/update-profile" style={{ padding: "8px 16px" }}>Update Profile</Link></li>
+                <li style={{ margin: "5px 0" }}><span className="dropdown-item" style={{ cursor: "pointer", padding: "8px 16px" }} onClick={handleLogout}>Sign Out</span></li>
               </ul>
             </div>
           </div>
@@ -191,11 +184,13 @@ function Header() {
                 }}
               />
 
-              <ul className="dropdown-menu dropdown-menu-end">
-                <li className="text-center px-3">
+              <ul className="dropdown-menu dropdown-menu-end" style={{ padding: "10px 0", minWidth: "200px" }}>
+                <li className="text-center px-3" style={{ paddingBottom: "10px", borderBottom: "1px solid #e0e0e0", marginBottom: "10px" }}>
                   <img
                     src={
-                      staff?.profile_image
+                      staff?.profile_image?.startsWith("http")
+                        ? staff.profile_image
+                        : staff?.profile_image
                         ? `${BACKEND_URL}/${staff.profile_image}`
                         : "/assets/img/Vector.png"
                     }
@@ -208,11 +203,11 @@ function Header() {
                       objectFit: "cover",
                     }}
                   />
-                  <h6>{staff?.name || "Admin User"}</h6>
+                  <h6 style={{ margin: 0, fontSize: "14px", fontWeight: "600" }}>{staff?.name || "Admin User"}</h6>
                 </li>
-                <li><Link className="dropdown-item" to="/admin/change-password">Change Password</Link></li>
-                <li><Link className="dropdown-item" to="/admin/update-profile">Update Profile</Link></li>
-                <li><span className="dropdown-item" style={{ cursor: "pointer" }} onClick={handleLogout}>Sign Out</span></li>
+                <li style={{ margin: "5px 0" }}><Link className="dropdown-item" to="/admin/change-password" style={{ padding: "8px 16px" }}>Change Password</Link></li>
+                <li style={{ margin: "5px 0" }}><Link className="dropdown-item" to="/admin/update-profile" style={{ padding: "8px 16px" }}>Update Profile</Link></li>
+                <li style={{ margin: "5px 0" }}><span className="dropdown-item" style={{ cursor: "pointer", padding: "8px 16px" }} onClick={handleLogout}>Sign Out</span></li>
               </ul>
             </div>
           </div>
