@@ -589,10 +589,8 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                       checked={minor.checked}
                       onChange={() => handleMinorCheckbox(index)}
                       id={`minor-check-${index}`}
+                      aria-label={`Include minor ${index + 1} in waiver`}
                     />
-                    <label className="form-check-label ms-1" htmlFor={`minor-check-${index}`} style={{ fontSize: '12px' }}>
-                      Include
-                    </label>
                   </div>
                   
                   <div className="flex-grow-1">
@@ -646,12 +644,6 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                     Remove
                   </button>
                 </div>
-                {!minor.checked && (minor.first_name || minor.last_name || minor.dob) && (
-                  <div className="alert alert-warning mt-2 mb-0 py-2 px-3" style={{ fontSize: '13px' }}>
-                    <i className="fas fa-exclamation-triangle me-2"></i>
-                    Don't forget to check the box to include this minor in the waiver!
-                  </div>
-                )}
               </div>
             ))}
 
