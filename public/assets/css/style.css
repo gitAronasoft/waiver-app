@@ -266,7 +266,7 @@ th {
 
 .minor-section .btn {
   padding: 14px 30px;
-  background: #007bff;
+  /* background: #007bff; */
   color: #fff;
   border: none;
   border-radius: 10px;

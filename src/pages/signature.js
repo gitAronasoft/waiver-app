@@ -232,61 +232,6 @@ function Signature() {
     }
   };
 
-  const handleMinorCheckbox = (index) => {
-    const minors = [...form.minors];
-    minors[index].checked = !minors[index].checked;
-    const updated = { ...form, minors };
-    setForm(updated);
-    persistToLocalStorage(updated);
-    
-    // Update validation errors in a single batch
-    setMinorErrors(prevErrors => {
-      const errors = { ...prevErrors };
-      
-      if (minors[index].checked) {
-        // If checking the box, validate all fields immediately
-        const fields = [
-          { name: 'first_name', value: minors[index].first_name, label: 'First' },
-          { name: 'last_name', value: minors[index].last_name, label: 'Last' },
-          { name: 'dob', value: minors[index].dob, label: 'DOB' }
-        ];
-        
-        fields.forEach(({ name, value, label }) => {
-          const errorKey = `${index}_${name}`;
-          
-          if (name === 'first_name' || name === 'last_name') {
-            if (!value || value.trim() === '') {
-              errors[errorKey] = `${label} name is required`;
-            } else if (value.trim().length < 2) {
-              errors[errorKey] = `${label} name must be at least 2 characters`;
-            } else {
-              delete errors[errorKey];
-            }
-          } else if (name === 'dob') {
-            if (!value) {
-              errors[errorKey] = 'Date of birth is required';
-            } else {
-              const dobDate = new Date(value);
-              const today = new Date();
-              if (dobDate > today) {
-                errors[errorKey] = 'Date of birth cannot be in the future';
-              } else {
-                delete errors[errorKey];
-              }
-            }
-          }
-        });
-      } else {
-        // If unchecking, clear validation errors for this minor
-        delete errors[`${index}_first_name`];
-        delete errors[`${index}_last_name`];
-        delete errors[`${index}_dob`];
-      }
-      
-      return errors;
-    });
-  };
-
   const handleAddMinor = () => {
     const updated = {
       ...form,
@@ -600,13 +545,9 @@ otherwise intoxicated are not recommended to engage in activities.</p>
 
                                 <p class="my-4"> <strong>{form.fullName || "_______"}</strong>&nbsp;&nbsp;  I agree that I will be responsible for property damage as a result of any unauthorized activity. </p>
                            
-
-                            <p class="paragraph-heading"> RELEASE OF LIABILITY, WAIVER OF CLAIMS AND INDEMNITY AGREEMENT </p><br></br>
-
-                           <p>In consideration of SPI agreeing to my participation, and permitting my use of SPIs equipment, room, and other facilities I hereby agree 
-as follows: </p><br></br>
-
-                            <p class="paragraph-heading"> In this Release Agreement the term “Activities” shall include all activities, functions, events, orientations, 
+<p class="paragraph-heading"> RELEASE OF LIABILITY, WAIVER OF CLAIMS AND INDEMNITY AGREEMENT </p>
+<p>In consideration of SPI agreeing to my participation, and permitting my use of SPIs equipment, room, and other facilities I hereby agree as follows: </p>
+ <p class="paragraph-heading"> In this Release Agreement the term “Activities” shall include all activities, functions, events, orientations, 
 instruction sessions, competitions and services provided, arranged, organized, sponsored or authorized by SPI </p>
 
 
@@ -617,14 +558,9 @@ respect of the provision of or the failure to provide any warnings, ,<strong>fai
 Activities or the risks, dangers and hazards of participating in the Activities. I understand that negligence includes the failure on the 
 part of SPI to take reasonable steps to safeguard or protect me from the risks.</p> 
 
-                            <p> <span class="paragraph-heading"> TO HOLD HARMLESS AND INDEMNIFY SPI </span> from any and all liability for any property damage or personal injury to any third 
-party resulting from any of my actions. </p><br></br>
-
-                            <p> This waiver shall be effective in the Province of Ontario and binding upon my heirs, next of kin, executors, and administrators in the 
-event of death, injury or incapacity. </p><br></br><br></br>
-
-                            <p> Any litigation involving the parties to this document shall be brought solely within the Province of Ontario and shall be within the 
-exclusive jurisdiction of the Courts residing in the City of Ottawa. </p>
+                            <p> <span class="paragraph-heading"> TO HOLD HARMLESS AND INDEMNIFY SPI </span> from any and all liability for any property damage or personal injury to any third party resulting from any of my actions. </p>
+<p> This waiver shall be effective in the Province of Ontario and binding upon my heirs, next of kin, executors, and administrators in the event of death, injury or incapacity. </p>
+<p> Any litigation involving the parties to this document shall be brought solely within the Province of Ontario and shall be within the exclusive jurisdiction of the Courts residing in the City of Ottawa. </p>
 
                             <p class="my-4"><strong>{form.fullName || "_______"}</strong>&nbsp;&nbsp; <strong>  PHOTOGRAPH / VIDEO RELEASEInitial</strong>&nbsp;&nbsp;   I consent to photographs and videos being taken of me during my 
 participation at SPI, and to the publication of the photographs and videos for advertising, promotional, and marketing purposes. I 
@@ -654,145 +590,188 @@ OF RESULTING PERSONAL INJURY, DEATH, PROPERTY DAMAGE OR LOSS DIRECTLY OR INDIREC
 WITH MY PARTICIPATION IN THE ACTIVITY. I HAVE READ THIS RELEASE AGREEMENT AND FULLY UNDERSTAND ITS 
 CONTENTS AND VOLUNTARILY AGREE TO ITS TERMS  </p> 
 
-<p> <span class="paragraph-heading">I CONFIRM THAT I HAVE READ AND UNDERSTAND THIS WAIVER PRIOR TO SIGNING IT, AND I AM AWARE THAT BY 
+<p>I CONFIRM THAT I HAVE READ AND UNDERSTAND THIS WAIVER PRIOR TO SIGNING IT, AND I AM AWARE THAT BY 
 SIGNING THIS WAIVER I AM WAIVING CERTIAN LEGAL RIGHTS WHICH I OR MY HEIRS, NEXT OF KIN, EXECUTORS, 
-AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
+AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
 
-            {!isReturning && <h5 className="mt-4 mb-3">Please check mark to sign on behalf of the below minor or dependent</h5>}
+            {/* Minor fields at top */}
             {form.minors.filter(minor => isReturning ? minor.checked : true).map((minor, index) => (
-              <div key={index} className="minor-group my-3 p-3 border rounded" style={{ backgroundColor: minor.checked ? '#f0f8ff' : '#fff' }}>
-                <div className="d-flex gap-2 align-items-start w-100">
-                  <div className="form-check mt-2">
+              <div key={index} className="my-3 no-print">
+                <div className="row g-2 align-items-start">
+                  <div className="col-12 col-md-3">
                     <input
-                      type="checkbox"
-                      className="form-check-input"
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                      checked={minor.checked}
-                      onChange={() => handleMinorCheckbox(index)}
-                      id={`minor-check-${index}`}
-                      aria-label={`Include minor ${index + 1} in waiver`}
+                      type="date"
+                      className={`form-control ${minorErrors[`${index}_dob`] ? 'is-invalid' : ''}`}
+                      value={minor.dob}
+                      onChange={(e) => handleMinorChange(index, "dob", e.target.value)}
+                      readOnly={!minor.isNew}
+                      style={{
+                        backgroundColor: '#e9ecef',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 15px',
+                        cursor: minor.isNew ? 'text' : 'not-allowed'
+                      }}
                     />
+                    {minorErrors[`${index}_dob`] && (
+                      <div className="text-danger small mt-1">{minorErrors[`${index}_dob`]}</div>
+                    )}
                   </div>
                   
-                  <div className="flex-grow-1">
-                    <div className="row g-2">
-                      <div className="col-md-3 col-sm-6">
-                        <input
-                          type="text"
-                          className={`form-control ${minorErrors[`${index}_first_name`] ? 'is-invalid' : ''}`}
-                          placeholder="Minor First Name *"
-                          value={minor.first_name}
-                          onChange={(e) => handleMinorChange(index, "first_name", e.target.value)}
-                          readOnly={!minor.isNew}
-                          style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
-                        />
-                        {minorErrors[`${index}_first_name`] && (
-                          <div className="invalid-feedback d-block">
-                            {minorErrors[`${index}_first_name`]}
-                          </div>
-                        )}
-                      </div>
-                      <div className="col-md-3 col-sm-6">
-                        <input
-                          type="text"
-                          className={`form-control ${minorErrors[`${index}_last_name`] ? 'is-invalid' : ''}`}
-                          placeholder="Minor Last Name *"
-                          value={minor.last_name}
-                          onChange={(e) => handleMinorChange(index, "last_name", e.target.value)}
-                          readOnly={!minor.isNew}
-                          style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
-                        />
-                        {minorErrors[`${index}_last_name`] && (
-                          <div className="invalid-feedback d-block">
-                            {minorErrors[`${index}_last_name`]}
-                          </div>
-                        )}
-                      </div>
-                      <div className="col-md-3 col-sm-6">
-                        <input
-                          type="date"
-                          className={`form-control ${minorErrors[`${index}_dob`] ? 'is-invalid' : ''}`}
-                          value={minor.dob}
-                          onChange={(e) => handleMinorChange(index, "dob", e.target.value)}
-                          placeholder="Date of Birth *"
-                          readOnly={!minor.isNew}
-                          style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
-                        />
-                        {minorErrors[`${index}_dob`] && (
-                          <div className="invalid-feedback d-block">
-                            {minorErrors[`${index}_dob`]}
-                          </div>
-                        )}
-                      </div>
-                      <div className="col-md-3 col-sm-6 d-flex align-items-start">
-                        {minor.isNew && (
-                          <button type="button" className="btn btn-danger btn-sm no-print w-100" onClick={() => handleRemoveMinor(index)}>
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                  <div className="col-12 col-md-3">
+                    <input
+                      type="text"
+                      className={`form-control ${minorErrors[`${index}_first_name`] ? 'is-invalid' : ''}`}
+                      placeholder="Full Name"
+                      value={minor.first_name}
+                      onChange={(e) => handleMinorChange(index, "first_name", e.target.value)}
+                      readOnly={!minor.isNew}
+                      style={{
+                        backgroundColor: '#e9ecef',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 15px',
+                        cursor: minor.isNew ? 'text' : 'not-allowed'
+                      }}
+                    />
+                    {minorErrors[`${index}_first_name`] && (
+                      <div className="text-danger small mt-1">{minorErrors[`${index}_first_name`]}</div>
+                    )}
+                  </div>
+                  
+                  <div className="col-12 col-md-3">
+                    <input
+                      type="text"
+                      className={`form-control ${minorErrors[`${index}_last_name`] ? 'is-invalid' : ''}`}
+                      placeholder="Full Name"
+                      value={minor.last_name}
+                      onChange={(e) => handleMinorChange(index, "last_name", e.target.value)}
+                      readOnly={!minor.isNew}
+                      style={{
+                        backgroundColor: '#e9ecef',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 15px',
+                        cursor: minor.isNew ? 'text' : 'not-allowed'
+                      }}
+                    />
+                    {minorErrors[`${index}_last_name`] && (
+                      <div className="text-danger small mt-1">{minorErrors[`${index}_last_name`]}</div>
+                    )}
+                  </div>
+                  
+                  <div className="col-12 col-md-3">
+                    {minor.isNew ? (
+                      <button 
+                        className="btn w-100" 
+                        onClick={() => handleRemoveMinor(index)}
+                        style={{
+                          backgroundColor: '#6c757d',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '10px 15px',
+                          fontSize: '14px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>
             ))}
-
+            
             {!isReturning && (
-              <button className="btn btn-secondary my-2 no-print" onClick={handleAddMinor}>
-                Add another minor
-              </button>
+              <div className="my-3 no-print">
+                <div className="row g-2 align-items-start">
+                  <div className="col-12 col-md-9"></div>
+                  <div className="col-12 col-md-3">
+                    <button 
+                      className="btn btn-primary w-100" 
+                      onClick={handleAddMinor}
+                      style={{
+                        backgroundColor: '#007bff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 15px',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Add another minor
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
 
-              {/* <div className="mt-3 mb-4 no-print">
-                <label>
-                  <input
-                    type="checkbox"
-                    name="subscribed"
-                    checked
-                    onChange={handleChange}
-                  />{" "}
-                  I would like to subscribe to updates from Elevation Trampoline South Shore
-                </label>
-              </div> */}
-
-
-
-            <div className="confirm-box mt-4 mb-3 no-print">
-              <label className="custom-checkbox-wrapper">
+            <div className="confirm-box mt-4 mb-4 no-print">
+              <label className="d-flex align-items-start gap-2">
                 <input
                   type="checkbox"
-                  className="custom-checkbox"
+                  className="custom-checkbox mt-1"
                   name="consented"
                   checked={form.consented}
                   onChange={handleChange}
+                  style={{ width: '24px', height: '24px', cursor: 'pointer', flexShrink: 0 }}
                 />
-                <span className="custom-checkbox-label">
-                  <h5>
-                    By checking this box, you confirm signing for yourself and all listed minors or
-                    dependents above, as of the provided date.
-                  </h5>
+                <span style={{ fontSize: '16px', lineHeight: '1.5' }}>
+                  <strong>By checking this box, you confirm signingfor yourself and all listed minors or
+                  dependents above, as of the provided date.</strong> 
                 </span>
               </label>
             </div>
 
-            <div className="signature-section mx-auto w-50 mb-4">
+            <div className="signature-section mb-4 no-print col-sm-6">
               <div className="d-flex justify-content-between align-items-center mb-2">
-                <div class="no-print">Please sign here:</div>
-                <div  class="no-print" style={{ cursor: "pointer", color: "red" }} onClick={handleClearSignature}>
+                <div style={{ color: '#6c757d', fontSize: '14px' }}>Please sign here:</div>
+                <div 
+                  style={{ cursor: "pointer", color: "#999", fontSize: '14px', textDecoration: 'none' }} 
+                  onClick={handleClearSignature}
+                >
                   ✕ Clear
                 </div>
               </div>
 
-              <SignaturePad
-                ref={sigPadRef}
-                canvasProps={{ width: 500, height: 150, className: "border" }}
-              />
+              <div style={{ 
+                border: '2px dashed #ccc', 
+                borderRadius: '4px',
+                padding: '10px',
+                backgroundColor: '#fff',
+                width: '100%'
+              }}>
+                <SignaturePad
+                  ref={sigPadRef}
+                  canvasProps={{ 
+                    width: 1000, 
+                    height: 150, 
+                    style: { 
+                      width: '100%', 
+                      height: '150px',
+                      display: 'block'
+                    } 
+                  }}
+                />
+              </div>
 
-       
-
-              <div>
-                <button className="btn btn-primary no-print" onClick={handleSubmit} disabled={submitting}>
-                  {submitting ? "Submitting..." : "Accept and Continue"}
+              <div className="text-center mt-4">
+                <button 
+                  className="btn btn-primary" 
+                  onClick={handleSubmit} 
+                  disabled={submitting}
+                  style={{
+                    backgroundColor: '#007bff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '12px 60px',
+                    fontSize: '16px',
+                    fontWeight: '500',
+                    minWidth: '500px'
+                  }}
+                >
+                  {submitting ? "Submitting..." : "Accept and continue"}
                 </button>
               </div>
             </div>

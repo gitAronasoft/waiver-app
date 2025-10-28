@@ -248,10 +248,10 @@ th {
   text-align: left;
 }
 
-.minor-section {
+/* .minor-section {
   max-width: 1000px;
   margin: 40px auto;
-}
+} */
 
 .minor-group {
   display: flex;
