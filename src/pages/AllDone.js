@@ -1,33 +1,48 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Confetti from "react-confetti"; // Install: npm install react-confetti
 
 
 function AllDone() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [countdown, setCountdown] = useState(5); // 5-second countdown
+  const completed = location.state?.completed;
 
   const handleReturn = () => {
-    navigate("/"); // Redirect to home
+    // Clear all form data and redirect to home
+    localStorage.removeItem("signatureForm");
+    localStorage.removeItem("customerForm");
+    // Replace current entry and navigate home
+    navigate("/", { replace: true });
   };
 
   useEffect(() => {
+    // Route protection: Only accessible if coming from valid flow
+    if (!completed) {
+      console.warn("Direct access to AllDone page blocked, redirecting to home");
+      navigate("/", { replace: true });
+      return;
+    }
+
     // Clear localStorage when component mounts
     localStorage.removeItem("signatureForm");
+    localStorage.removeItem("customerForm");
     
     // Countdown timer
     const interval = setInterval(() => {
       setCountdown((prev) => {
         if (prev === 1) {
           clearInterval(interval);
-          navigate("/"); // Auto redirect after 5 sec
+          // Clear history stack and redirect to home
+          navigate("/", { replace: true });
         }
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [navigate]);
+  }, [navigate, completed]);
 
 
   return (

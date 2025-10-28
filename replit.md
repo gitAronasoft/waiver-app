@@ -6,7 +6,31 @@ This project is a full-stack waiver management system designed for Skate & Play.
 ## User Preferences
 I prefer simple language in explanations. I want iterative development, with frequent, small updates rather than large, infrequent ones. Please ask before making major changes or architectural decisions. Do not make changes to the `Backend-old` folder or any duplicate components.
 
-## Recent Changes (October 28, 2025 - Major Architecture Refactor)
+## Recent Changes
+
+### October 28, 2025 - Route Protection & Browser History Management
+- **Route Protection Implementation**: Added comprehensive guards to prevent direct URL access to protected pages:
+  - All waiver flow pages (Signature, RuleReminder, AllDone, ConfirmCustomerInfo, UserDashboard) now validate required state
+  - Users attempting to access protected pages directly are immediately redirected to home
+  - Prevents form manipulation and ensures proper flow sequence
+  
+- **Browser History Management**: Fixed back button issues after waiver completion:
+  - Updated all navigation to use `replace: true` to replace history entries instead of adding new ones
+  - After completing a waiver, back button can no longer return to completed forms
+  - Prevents duplicate submissions and user confusion
+  
+- **Enhanced Completion Flow**:
+  - AllDone page now requires completion flag in state
+  - Clears all localStorage data (signatureForm, customerForm) on completion
+  - Auto-redirects to home after 5 seconds with cleared history
+  
+- **Protected Flows**:
+  - **New Waiver**: New Waiver → OTP → Signature (guarded) → Rules (guarded) → AllDone (guarded) → Home
+  - **Existing User**: Existing User → OTP → My Waivers (guarded) → Confirm Info (guarded) → Signature (guarded) → Rules (guarded) → AllDone (guarded) → Home
+  - Direct URL access to any protected step redirects to home
+  - Back navigation after completion blocked
+
+### October 28, 2025 - Major Architecture Refactor
 - **Multi-Customer-Per-Phone Architecture**: Completely refactored the system to support multiple customer records with the same phone number. The system now:
   - **Always creates NEW customer records** for each "New Waiver" signup, even if phone number already exists
   - Allows same phone number to have multiple customers with different names, addresses, and minors

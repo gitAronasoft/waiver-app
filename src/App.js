@@ -7,7 +7,6 @@ import ExistingCustomerLogin from "./pages/ExistingCustomerLogin";
 import Optverified from "./pages/otpverified";
 import ConfirmCustomerInfo from "./pages/ConfirmCustomerInfo";
 import RuleReminder from "./pages/RuleReminder";
-import WaiverCompleteScreen from "./pages/WaiverCompleteScreen";
 import Signature from "./pages/signature";
 import AllDone from "./pages/AllDone";
 import StarRating from "./pages/StarRatingPage";
@@ -34,7 +33,7 @@ function App() {
       <Routes>
         {/* Admin Public Route */}
         <Route path="/admin/login" element={<LoginAdmin />} />
-        
+
           <Route path="admin/forgot-password" element={<ForgotPasswordForm />} />
                 <Route path="/admin/reset-password" element={<ResetPasswordForm />} />
 
@@ -71,7 +70,7 @@ function App() {
             </AdminPrivateRoute>
           }
         />
-      
+
 
          <Route
           path="admin/staff-list"
@@ -90,7 +89,7 @@ function App() {
             </AdminPrivateRoute>
           }
         />
-        
+
            <Route
           path="admin/update-staff/:id"
           element={
@@ -128,7 +127,7 @@ function App() {
         <Route path="/confirm-info" element={<ConfirmCustomerInfo />} />
         <Route path="/signature" element={<Signature />} />
         <Route path="/rules" element={<RuleReminder />} />
-        <Route path="/complete" element={<WaiverCompleteScreen />} />
+
         <Route path="/all-done" element={<AllDone />} />
         <Route path="/rate/:id" element={<StarRating />} />
         {/* <Route path="/feedback/:id" element={<Feedback />} /> */}
@@ -141,4 +140,3 @@ function App() {
 }
 
 export default App;
-

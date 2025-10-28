@@ -25,6 +25,14 @@ function Signature() {
   const customerId = location.state?.customerId;
   const isReturning = location.state?.isReturning || false;
 
+  // Route protection: Redirect if accessed directly without valid state
+  useEffect(() => {
+    if (!phone) {
+      console.warn("No phone found in state, redirecting to home");
+      navigate("/", { replace: true });
+    }
+  }, [phone, navigate]);
+
   const [form, setForm] = useState({
     date: "",
     fullName: "",
@@ -84,28 +92,12 @@ function Signature() {
   useEffect(() => {
     if (!phone) return;
 
-    const savedData = localStorage.getItem("signatureForm");
-    if (savedData) {
-      const parsed = JSON.parse(savedData);
-      const hasData =
-        parsed.form &&
-        (parsed.form.fullName ||
-          (parsed.form.minors && parsed.form.minors.length > 0));
-
-      if (hasData) {
-        console.log("Skipping fetch because saved data has content");
-        return;
-      }
-    }
-
     const fetchCustomer = async () => {
       setLoading(true);
       try {
-        const endpoint = location.state?.formData 
-          ? null 
-          : `${BACKEND_URL}/api/waivers/getminors?phone=${phone}`;
-        
         let data;
+        
+        // Always prioritize data from location.state if available
         if (location.state?.formData) {
           // Use data from confirm-info page
           data = location.state.formData;
@@ -124,7 +116,8 @@ function Signature() {
             })),
           }));
         } else {
-          // Fetch from API
+          // Only fetch from API if no formData in state
+          const endpoint = `${BACKEND_URL}/api/waivers/getminors?phone=${phone}`;
           const response = await axios.get(endpoint);
           data = response.data;
           setCustomerData(data);
@@ -190,35 +183,6 @@ function Signature() {
     persistToLocalStorage(updated);
   };
 
-  const validateMinorField = (index, field, value) => {
-    const errors = { ...minorErrors };
-    const errorKey = `${index}_${field}`;
-    
-    if (field === 'first_name' || field === 'last_name') {
-      if (value.trim() === '') {
-        errors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name is required`;
-      } else if (value.trim().length < 2) {
-        errors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name must be at least 2 characters`;
-      } else {
-        delete errors[errorKey];
-      }
-    } else if (field === 'dob') {
-      if (!value) {
-        errors[errorKey] = 'Date of birth is required';
-      } else {
-        const dobDate = new Date(value);
-        const today = new Date();
-        if (dobDate > today) {
-          errors[errorKey] = 'Date of birth cannot be in the future';
-        } else {
-          delete errors[errorKey];
-        }
-      }
-    }
-    
-    setMinorErrors(errors);
-  };
-
   const handleMinorChange = (index, field, value) => {
     const minors = [...form.minors];
     minors[index][field] = value;
@@ -226,9 +190,12 @@ function Signature() {
     setForm(updated);
     persistToLocalStorage(updated);
     
-    // Validate the field if it's checked
-    if (minors[index].checked) {
-      validateMinorField(index, field, value);
+    // Clear error for this field when user types
+    const errorKey = `${index}_${field}`;
+    if (minorErrors[errorKey]) {
+      const newErrors = { ...minorErrors };
+      delete newErrors[errorKey];
+      setMinorErrors(newErrors);
     }
   };
 
@@ -251,37 +218,21 @@ function Signature() {
     setForm(updated);
     persistToLocalStorage(updated);
     
-    // Clear all validation errors and rebuild for remaining minors
+    // Clear errors for removed minor and rebuild error keys for remaining minors
     const newErrors = {};
-    minors.forEach((minor, newIndex) => {
-      if (minor.checked) {
-        // Re-validate remaining checked minors with their new indices
-        const fields = ['first_name', 'last_name', 'dob'];
-        fields.forEach(field => {
-          const errorKey = `${newIndex}_${field}`;
-          const value = minor[field];
-          
-          if (field === 'first_name' || field === 'last_name') {
-            if (!value || value.trim() === '') {
-              newErrors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name is required`;
-            } else if (value.trim().length < 2) {
-              newErrors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name must be at least 2 characters`;
-            }
-          } else if (field === 'dob') {
-            if (!value) {
-              newErrors[errorKey] = 'Date of birth is required';
-            } else {
-              const dobDate = new Date(value);
-              const today = new Date();
-              if (dobDate > today) {
-                newErrors[errorKey] = 'Date of birth cannot be in the future';
-              }
-            }
-          }
-        });
+    Object.keys(minorErrors).forEach(key => {
+      const [errorIndex, field] = key.split('_');
+      const idx = parseInt(errorIndex);
+      if (idx < index) {
+        // Keep errors for minors before the removed one
+        newErrors[key] = minorErrors[key];
+      } else if (idx > index) {
+        // Shift down errors for minors after the removed one
+        const newKey = `${idx - 1}_${field}`;
+        newErrors[newKey] = minorErrors[key];
       }
+      // Skip errors for the removed minor (idx === index)
     });
-    
     setMinorErrors(newErrors);
   };
 
@@ -292,6 +243,9 @@ function Signature() {
   };
 
   const handleSubmit = async () => {
+    // Clear previous errors
+    setMinorErrors({});
+
     if (!form.consented) {
       toast.error("Please agree to the terms by checking the consent box.");
       return;
@@ -302,61 +256,64 @@ function Signature() {
       return;
     }
 
-    // For returning users: only include checked minors (unchecked minors are from previous visits)
-    // For new users: keep unchecked minors with data to trigger validation error
-    const cleanedMinors = form.minors.filter(m => {
-      if (isReturning) {
-        // For returning users, only include checked minors
-        return m.checked;
-      } else {
-        // For new users, remove only completely empty unchecked minors
-        if (!m.checked) {
-          const hasData = m.first_name.trim() || m.last_name.trim() || m.dob;
-          return hasData;
+    // Validate all minors and collect errors
+    const validationErrors = {};
+    let hasErrors = false;
+    
+    form.minors.forEach((minor, index) => {
+      // Check if minor has any data entered
+      const hasData = minor.first_name?.trim() || minor.last_name?.trim() || minor.dob;
+      
+      // Only validate minors that have some data entered
+      if (hasData) {
+        // Validate first name
+        if (!minor.first_name || minor.first_name.trim() === '') {
+          validationErrors[`${index}_first_name`] = 'First name is required';
+          hasErrors = true;
+        } else if (minor.first_name.trim().length < 2) {
+          validationErrors[`${index}_first_name`] = 'First name must be at least 2 characters';
+          hasErrors = true;
         }
-        return true;
+        
+        // Validate last name
+        if (!minor.last_name || minor.last_name.trim() === '') {
+          validationErrors[`${index}_last_name`] = 'Last name is required';
+          hasErrors = true;
+        } else if (minor.last_name.trim().length < 2) {
+          validationErrors[`${index}_last_name`] = 'Last name must be at least 2 characters';
+          hasErrors = true;
+        }
+        
+        // Validate date of birth
+        if (!minor.dob) {
+          validationErrors[`${index}_dob`] = 'Date of birth is required';
+          hasErrors = true;
+        } else {
+          const dobDate = new Date(minor.dob);
+          const today = new Date();
+          if (dobDate > today) {
+            validationErrors[`${index}_dob`] = 'Date of birth cannot be in the future';
+            hasErrors = true;
+          }
+        }
       }
     });
+
+    // If there are validation errors, set them and show toast
+    if (hasErrors) {
+      setMinorErrors(validationErrors);
+      toast.error("Please complete all required information for minors correctly.");
+      return;
+    }
+
+    // Only include minors with all required fields filled
+    const cleanedMinors = form.minors.filter(m => 
+      m.first_name?.trim() && m.last_name?.trim() && m.dob
+    );
 
     // Update form with cleaned minors
     const updatedForm = { ...form, minors: cleanedMinors };
     setForm(updatedForm);
-
-    // Check if there are minors added but not checked (only for new users)
-    if (!isReturning) {
-      const uncheckedMinors = cleanedMinors.filter(m => !m.checked);
-      const uncheckedWithData = uncheckedMinors.filter(
-        m => m.first_name.trim() || m.last_name.trim() || m.dob
-      );
-      
-      if (uncheckedWithData.length > 0) {
-        toast.error(`You have added ${uncheckedWithData.length} minor(s) but haven't checked the box to include them. Please check the box next to each minor you want to include, or remove them.`);
-        return;
-      }
-    }
-
-    const checkedMinors = cleanedMinors.filter(m => m.checked);
-    if (checkedMinors.length > 0) {
-      const invalidMinors = checkedMinors.filter(
-        m => !m.first_name.trim() || !m.last_name.trim() || !m.dob
-      );
-      
-      if (invalidMinors.length > 0) {
-        toast.error("Please complete all information (first name, last name, and date of birth) for all checked minors.");
-        return;
-      }
-
-      const minorsWithFutureDOB = checkedMinors.filter(m => {
-        const dobDate = new Date(m.dob);
-        const today = new Date();
-        return dobDate > today;
-      });
-
-      if (minorsWithFutureDOB.length > 0) {
-        toast.error("Date of birth cannot be in the future for any minor.");
-        return;
-      }
-    }
 
     setSubmitting(true);
 
@@ -393,6 +350,7 @@ function Signature() {
       
       toast.success("Signature submitted sucessfully.");
       navigate("/rules", {
+        replace: true,
         state: { userId: customerData?.id, phone, customerType },
       });
     } catch (error) {
@@ -740,16 +698,17 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
                 borderRadius: '4px',
                 padding: '10px',
                 backgroundColor: '#fff',
-                width: '100%'
+                width: '100%',
+                maxWidth: '600px'
               }}>
                 <SignaturePad
                   ref={sigPadRef}
                   canvasProps={{ 
-                    width: 1000, 
-                    height: 150, 
+                    width: 600, 
+                    height: 200, 
                     style: { 
-                      width: '100%', 
-                      height: '150px',
+                      width: '600px', 
+                      height: '200px',
                       display: 'block'
                     } 
                   }}

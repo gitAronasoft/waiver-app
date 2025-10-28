@@ -12,6 +12,14 @@ function ConfirmCustomerInfo() {
   const isReturning = location.state?.isReturning || false;
 
   const [formData, setFormData] = useState(null);
+
+  // Route protection: Redirect if accessed directly without valid state
+  useEffect(() => {
+    if (!phone && !customerId) {
+      console.warn("No phone or customerId found in state, redirecting to home");
+      navigate("/", { replace: true });
+    }
+  }, [phone, customerId, navigate]);
   const [minorList, setMinorList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -222,6 +230,7 @@ function ConfirmCustomerInfo() {
       }
 
       navigate("/signature", {
+        replace: true,
         state: {
           phone,
           formData: updatedData,
@@ -247,7 +256,7 @@ function ConfirmCustomerInfo() {
           <div className="col-md-2">
             <div className="back-btn">
               <Link
-                to={isReturning ? "/user-dashboard" : "/existing-customer"}
+                to={isReturning ? "/my-waivers" : "/existing-customer"}
                 state={{ phone }}
               >
                 <img

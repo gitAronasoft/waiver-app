@@ -15,8 +15,8 @@ function UserDashboard() {
 
   useEffect(() => {
     if (!phone) {
-      toast.error("Phone number required");
-      navigate("/existing-customer");
+      console.warn("No phone found in state, redirecting to home");
+      navigate("/", { replace: true });
       return;
     }
 

@@ -12,13 +12,21 @@ function RuleReminder() {
   const customerType = location.state?.customerType || "existing";
   const [loading, setLoading] = useState(false);
 
+  // Route protection: Redirect if accessed directly without valid state
+  React.useEffect(() => {
+    if (!userId || !phone) {
+      console.warn("No userId or phone found in state, redirecting to home");
+      navigate("/", { replace: true });
+    }
+  }, [userId, phone, navigate]);
+
   const handleConfirm = async () => {
     setLoading(true);
     try {
       await axios.post(`${BACKEND_URL}/api/waivers/accept-rules`, { userId });
       localStorage.removeItem("signatureForm"); // Clear saved signature and form data
       toast.success("Rules accepted!");
-      navigate("/all-done");
+      navigate("/all-done", { replace: true, state: { completed: true } });
     } catch (error) {
       console.error(error);
       toast.error("Failed to update waiver status.");

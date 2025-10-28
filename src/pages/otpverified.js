@@ -66,9 +66,9 @@ const verifyOtp = async (otpValue) => {
 
       if (customerType === "dashboard" || customerType === "existing") {
         // Both existing customer and dashboard go to history dashboard
-        navigate("/my-waivers", { state: { phone } });
+        navigate("/my-waivers", { replace: true, state: { phone } });
       } else if (customerType === "new") {
-        navigate("/signature", { state: { phone } });
+        navigate("/signature", { replace: true, state: { phone, customerType } });
       }
     } else {
       toast.error("Invalid OTP. Please try again.");

@@ -466,7 +466,7 @@ function NewCustomerForm() {
               <div className="text-start my-4">
                 <div className="d-flex align-items-center custom-radio-wrapper">
                   <h5>I'm signing on behalf of a minor or dependent</h5>
-                  <label className="ms-3">
+                  <label className="ms-3 d-flex align-items-center">
                     <input
                       type="radio"
                       name="signing_for_minor"
@@ -479,10 +479,11 @@ function NewCustomerForm() {
                           ]);
                         }
                       }}
+                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                     />{" "}
-                    Yes
+                    <span className="ms-2">Yes</span>
                   </label>
-                  <label className="ms-3">
+                  <label className="ms-3 d-flex align-items-center">
                     <input
                       type="radio"
                       name="signing_for_minor"
@@ -494,8 +495,9 @@ function NewCustomerForm() {
                         }));
                         setMinorList([]);
                       }}
+                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                     />{" "}
-                    No
+                    <span className="ms-2">No</span>
                   </label>
                 </div>
               </div>
@@ -504,8 +506,8 @@ function NewCustomerForm() {
                 <>
                   {minorList.map((minor, index) => (
                     <div key={index} className="mb-3">
-                      <div className="minor-group d-flex gap-2">
-                        <div className="flex-fill">
+                      <div className="row g-2 align-items-start">
+                        <div className="col-12 col-md-3">
                           <input
                             type="text"
                             className={`form-control ${errors[`minor_${index}_first_name`] ? 'is-invalid' : ''}`}
@@ -514,12 +516,18 @@ function NewCustomerForm() {
                             onChange={(e) =>
                               handleMinorChange(index, "first_name", e.target.value)
                             }
+                            style={{
+                              backgroundColor: '#e9ecef',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '12px 15px'
+                            }}
                           />
                           {errors[`minor_${index}_first_name`] && (
                             <small className="text-danger d-block mt-1">{errors[`minor_${index}_first_name`]}</small>
                           )}
                         </div>
-                        <div className="flex-fill">
+                        <div className="col-12 col-md-3">
                           <input
                             type="text"
                             className={`form-control ${errors[`minor_${index}_last_name`] ? 'is-invalid' : ''}`}
@@ -528,12 +536,18 @@ function NewCustomerForm() {
                             onChange={(e) =>
                               handleMinorChange(index, "last_name", e.target.value)
                             }
+                            style={{
+                              backgroundColor: '#e9ecef',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '12px 15px'
+                            }}
                           />
                           {errors[`minor_${index}_last_name`] && (
                             <small className="text-danger d-block mt-1">{errors[`minor_${index}_last_name`]}</small>
                           )}
                         </div>
-                        <div className="flex-fill">
+                        <div className="col-12 col-md-3">
                           <input
                             type="date"
                             className={`form-control ${errors[`minor_${index}_dob`] ? 'is-invalid' : ''}`}
@@ -541,28 +555,55 @@ function NewCustomerForm() {
                             onChange={(e) =>
                               handleMinorChange(index, "dob", e.target.value)
                             }
+                            style={{
+                              backgroundColor: '#e9ecef',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '12px 15px'
+                            }}
                           />
                           {errors[`minor_${index}_dob`] && (
                             <small className="text-danger d-block mt-1">{errors[`minor_${index}_dob`]}</small>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          onClick={() => removeMinor(index)}
-                        >
-                          Remove
-                        </button>
+                        <div className="col-12 col-md-3">
+                          <button
+                            type="button"
+                            className="btn w-100"
+                            onClick={() => removeMinor(index)}
+                            style={{
+                              backgroundColor: '#8F9090',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '12px 15px',
+                              fontWeight: '500'
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={addMinor}
-                    className="btn btn-primary my-2"
-                  >
-                    Add another minor
-                  </button>
+                  <div className="text-end my-3">
+                    <button
+                      type="button"
+                      onClick={addMinor}
+                      className="btn"
+                      style={{
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '12px 40px',
+                        fontWeight: '500',
+                        fontSize: '16px'
+                      }}
+                    >
+                      Add another minor
+                    </button>
+                  </div>
                 </>
               )}
 
