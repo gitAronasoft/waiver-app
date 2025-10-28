@@ -22,6 +22,8 @@ function Signature() {
 
   const customerType = location.state?.customerType || "existing";
   const phone = location.state?.phone;
+  const customerId = location.state?.customerId;
+  const isReturning = location.state?.isReturning || false;
 
   const [form, setForm] = useState({
     date: "",
@@ -308,8 +310,21 @@ function Signature() {
       return;
     }
 
+    // Automatically remove completely empty unchecked minors before validation
+    const cleanedMinors = form.minors.filter(m => {
+      if (!m.checked) {
+        const hasData = m.first_name.trim() || m.last_name.trim() || m.dob;
+        return hasData;
+      }
+      return true;
+    });
+
+    // Update form with cleaned minors
+    const updatedForm = { ...form, minors: cleanedMinors };
+    setForm(updatedForm);
+
     // Check if there are minors added but not checked
-    const uncheckedMinors = form.minors.filter(m => !m.checked);
+    const uncheckedMinors = cleanedMinors.filter(m => !m.checked);
     const uncheckedWithData = uncheckedMinors.filter(
       m => m.first_name.trim() || m.last_name.trim() || m.dob
     );
@@ -319,7 +334,7 @@ function Signature() {
       return;
     }
 
-    const checkedMinors = form.minors.filter(m => m.checked);
+    const checkedMinors = cleanedMinors.filter(m => m.checked);
     if (checkedMinors.length > 0) {
       const invalidMinors = checkedMinors.filter(
         m => !m.first_name.trim() || !m.last_name.trim() || !m.dob
@@ -357,25 +372,24 @@ function Signature() {
     const signatureData = canvas.toDataURL("image/jpeg", 0.6); // compressed JPEG with white background
 
     setSignatureImage(signatureData);
-    localStorage.setItem(
-      "signatureForm",
-      JSON.stringify({ form, initials, signatureImage: signatureData })
-    );
 
     const payload = {
       id: customerData?.id,
       phone,
-      date: form.date,
-      fullName: form.fullName,
-      minors: form.minors,
-      subscribed: form.subscribed,
-      consented: form.consented,
+      date: updatedForm.date,
+      fullName: updatedForm.fullName,
+      minors: cleanedMinors,
+      subscribed: updatedForm.subscribed,
+      consented: updatedForm.consented,
       signature: signatureData,
     };
 
     try {
       await axios.post(`${BACKEND_URL}/api/waivers/save-signature`, payload);
  
+      // Clear localStorage after successful submission
+      localStorage.removeItem("signatureForm");
+      
       toast.success("Signature submitted sucessfully.");
       navigate("/rules", {
         state: { userId: customerData?.id, phone, customerType },
@@ -421,10 +435,20 @@ function formatPhone(phone = "") {
               </a>
             </div> */}
                       <div className="back-btn no-print" style={{ cursor: "pointer" }} onClick={() => {
+                        // Clear localStorage when going back
+                        localStorage.removeItem("signatureForm");
+                        
                         if (customerType === "new") {
                           navigate("/verify-otp", { state: { phone, customerType } });
                         } else {
-                          navigate("/confirm-info", { state: { phone, customerType } });
+                          navigate("/confirm-info", { 
+                            state: { 
+                              phone, 
+                              customerType,
+                              customerId,
+                              isReturning
+                            } 
+                          });
                         }
                       }}>
                          
@@ -578,9 +602,9 @@ CONTENTS AND VOLUNTARILY AGREE TO ITS TERMS  </p>
 SIGNING THIS WAIVER I AM WAIVING CERTIAN LEGAL RIGHTS WHICH I OR MY HEIRS, NEXT OF KIN, EXECUTORS, 
 AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
 
-            {form.minors.map((minor, index) => (
+            {!isReturning && form.minors.map((minor, index) => (
               <div key={index} className="minor-group my-3 p-3 border rounded" style={{ backgroundColor: minor.checked ? '#f0f8ff' : '#fff' }}>
-                <div className="d-flex gap-2 align-items-start">
+                <div className="d-flex gap-2 align-items-start w-100">
                   <div className="form-check mt-2">
                     <input
                       type="checkbox"
@@ -595,7 +619,7 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                   
                   <div className="flex-grow-1">
                     <div className="row g-2">
-                      <div className="col-md-4">
+                      <div className="col-md-3 col-sm-6">
                         <input
                           type="text"
                           className={`form-control ${minorErrors[`${index}_first_name`] ? 'is-invalid' : ''}`}
@@ -609,7 +633,7 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                           </div>
                         )}
                       </div>
-                      <div className="col-md-4">
+                      <div className="col-md-3 col-sm-6">
                         <input
                           type="text"
                           className={`form-control ${minorErrors[`${index}_last_name`] ? 'is-invalid' : ''}`}
@@ -623,7 +647,7 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                           </div>
                         )}
                       </div>
-                      <div className="col-md-4">
+                      <div className="col-md-3 col-sm-6">
                         <input
                           type="date"
                           className={`form-control ${minorErrors[`${index}_dob`] ? 'is-invalid' : ''}`}
@@ -637,19 +661,22 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                           </div>
                         )}
                       </div>
+                      <div className="col-md-3 col-sm-6 d-flex align-items-start">
+                        <button type="button" className="btn btn-danger btn-sm no-print w-100" onClick={() => handleRemoveMinor(index)}>
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  
-                  <button type="button" className="btn btn-danger btn-sm no-print" onClick={() => handleRemoveMinor(index)}>
-                    Remove
-                  </button>
                 </div>
               </div>
             ))}
 
-            <button className="btn btn-secondary my-2 no-print" onClick={handleAddMinor}>
-              Add another minor
-            </button>
+            {!isReturning && (
+              <button className="btn btn-secondary my-2 no-print" onClick={handleAddMinor}>
+                Add another minor
+              </button>
+            )}
 
               {/* <div className="mt-3 mb-4 no-print">
                 <label>

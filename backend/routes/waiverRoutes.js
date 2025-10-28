@@ -4,6 +4,7 @@ const waiverController = require('../controllers/waiverController');
 
 router.post('/', waiverController.createWaiver);
 router.get('/customer-info', waiverController.getCustomerInfo);
+router.get('/customer-info-by-id', waiverController.getCustomerInfoById);
 router.get('/customer-dashboard', waiverController.getCustomerDashboard);
 router.post('/update-customer', waiverController.updateCustomer);
 router.post('/save-signature', waiverController.saveSignature);

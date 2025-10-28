@@ -247,6 +247,55 @@ const getCustomerInfo = async (req, res) => {
 };
 
 /**
+ * Gets customer information by customer ID
+ * Includes associated minors
+ */
+const getCustomerInfoById = async (req, res) => {
+  try {
+    const { customerId } = req.query;
+
+    // Validate customerId parameter
+    if (!customerId) {
+      return res.status(400).json({
+        error: "Customer ID is required",
+      });
+    }
+
+    const [customers] = await db.query(
+      "SELECT * FROM customers WHERE id = ? LIMIT 1",
+      [customerId],
+    );
+
+    if (customers.length === 0) {
+      return res.status(404).json({
+        error: "Customer not found",
+      });
+    }
+
+    const customer = customers[0];
+
+    // Get ALL minors for this customer (not just status = 1)
+    const [minors] = await db.query(
+      "SELECT * FROM minors WHERE customer_id = ?",
+      [customer.id],
+    );
+
+    res.json({ customer, minors });
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching customer info by ID:`, {
+      message: error.message,
+      customerId: req.query.customerId,
+    });
+
+    res.status(500).json({
+      error: "Failed to fetch customer information",
+      errorId,
+    });
+  }
+};
+
+/**
  * Updates customer information and associated minors
  */
 const updateCustomer = async (req, res) => {
@@ -1264,6 +1313,7 @@ const getCustomerDashboard = async (req, res) => {
 module.exports = {
   createWaiver,
   getCustomerInfo,
+  getCustomerInfoById,
   updateCustomer,
   saveSignature,
   acceptRules,

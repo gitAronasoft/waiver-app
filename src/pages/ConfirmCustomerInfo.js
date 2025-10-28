@@ -8,6 +8,8 @@ function ConfirmCustomerInfo() {
   const location = useLocation();
   const navigate = useNavigate();
   const phone = location.state?.phone;
+  const customerId = location.state?.customerId;
+  const isReturning = location.state?.isReturning || false;
 
   const [formData, setFormData] = useState(null);
   const [minorList, setMinorList] = useState([]);
@@ -18,8 +20,13 @@ function ConfirmCustomerInfo() {
   useEffect(() => {
     if (phone) {
       setLoading(true);
+      
+      const endpoint = customerId 
+        ? `${BACKEND_URL}/api/waivers/customer-info-by-id?customerId=${customerId}`
+        : `${BACKEND_URL}/api/waivers/customer-info?phone=${phone}`;
+      
       axios
-        .get(`${BACKEND_URL}/api/waivers/customer-info?phone=${phone}`)
+        .get(endpoint)
         .then((res) => {
           const data = res.data.customer;
 
@@ -90,7 +97,7 @@ function ConfirmCustomerInfo() {
   const goToSignature = async () => {
     setUpdating(true);
     try {
-       const stripMask = (val) => (val ? val.replace(/\D/g, "") : ""); // ✅ remove formatting
+       const stripMask = (val) => (val ? val.replace(/\D/g, "") : "");
       const updatedData = {
         ...formData,
       
@@ -106,9 +113,18 @@ function ConfirmCustomerInfo() {
         })),
       };
 
-      await axios.post(`${BACKEND_URL}/api/waivers/update-customer`, updatedData);
+      if (!isReturning) {
+        await axios.post(`${BACKEND_URL}/api/waivers/update-customer`, updatedData);
+      }
        
-      navigate("/signature", { state: { phone, formData: updatedData } });
+      navigate("/signature", { 
+        state: { 
+          phone, 
+          formData: updatedData,
+          customerId: formData.id,
+          isReturning
+        } 
+      });
     } catch (err) {
       console.error("Error updating customer:", err);
       toast.error("Failed to update customer info.");
