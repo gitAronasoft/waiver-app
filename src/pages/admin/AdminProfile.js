@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import axios from "../../utils/axios";
 import { toast } from "react-toastify";
 import Header from "./components/header";
 import { BACKEND_URL } from '../../config';

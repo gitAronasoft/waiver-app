@@ -486,26 +486,12 @@ const saveSignature = async (req, res) => {
       console.log(`🗑️ Deleted ${minorsToDelete.length} minor(s) from customer ${id}`);
     }
 
-    // Get or create waiver form
-    const [waivers] = await db.query(
-      "SELECT id FROM waiver_forms WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1",
-      [id],
+    // Always create a NEW waiver form entry (for visit history tracking)
+    const [result] = await db.query(
+      "INSERT INTO waiver_forms (customer_id, signature_image, signed_at, completed) VALUES (?, ?, NOW(), 0)",
+      [id, signature],
     );
-
-    let waiverId;
-    if (waivers.length > 0) {
-      waiverId = waivers[0].id;
-      await db.query(
-        "UPDATE waiver_forms SET signature_image = ?, signed_at = NOW() WHERE id = ?",
-        [signature, waiverId],
-      );
-    } else {
-      const [result] = await db.query(
-        "INSERT INTO waiver_forms (customer_id, signature_image, signed_at, completed) VALUES (?, ?, NOW(), 0)",
-        [id, signature],
-      );
-      waiverId = result.insertId;
-    }
+    const waiverId = result.insertId;
 
     // Minors are already linked to customer via customer_id, no junction table needed
     console.log(`✅ Signature saved for waiver ${waiverId}`);
@@ -1310,6 +1296,49 @@ const getCustomerDashboard = async (req, res) => {
   }
 };
 
+/**
+ * Fetches the most recent signature for a customer
+ */
+const getSignature = async (req, res) => {
+  try {
+    const { customerId } = req.query;
+
+    if (!customerId) {
+      return res.status(400).json({
+        error: "Customer ID is required",
+      });
+    }
+
+    // Get the most recent waiver with a signature
+    const [waivers] = await db.query(
+      "SELECT signature_image FROM waiver_forms WHERE customer_id = ? AND signature_image IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+      [customerId],
+    );
+
+    if (waivers.length === 0) {
+      return res.status(404).json({
+        error: "No signature found for this customer",
+      });
+    }
+
+    res.json({
+      success: true,
+      signature: waivers[0].signature_image,
+    });
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching signature:`, {
+      message: error.message,
+      customerId: req.query.customerId,
+    });
+
+    res.status(500).json({
+      error: "Failed to fetch signature",
+      errorId,
+    });
+  }
+};
+
 module.exports = {
   createWaiver,
   getCustomerInfo,
@@ -1328,4 +1357,5 @@ module.exports = {
   getRatingInfo,
   saveRating,
   getCustomerDashboard,
+  getSignature,
 };

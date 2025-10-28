@@ -80,7 +80,7 @@ function Signature() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, initials, signatureImage]);
 
-  // Fetch customer data only if no meaningful local data exists
+  // Fetch customer data and pre-fill signature for returning users
   useEffect(() => {
     if (!phone) return;
 
@@ -98,30 +98,77 @@ function Signature() {
       }
     }
 
-    // console.log("LocalStorage empty, fetching customer data...");
-
     const fetchCustomer = async () => {
       setLoading(true);
       try {
-        const response = await axios.get(
-          `${BACKEND_URL}/api/waivers/getminors?phone=${phone}`
-        );
-        const data = response.data;
+        const endpoint = location.state?.formData 
+          ? null 
+          : `${BACKEND_URL}/api/waivers/getminors?phone=${phone}`;
+        
+        let data;
+        if (location.state?.formData) {
+          // Use data from confirm-info page
+          data = location.state.formData;
+          setCustomerData(data);
+          setForm((prev) => ({
+            ...prev,
+            date: new Date().toISOString().split("T")[0],
+            fullName: `${data.first_name} ${data.last_name}`,
+            minors: (data.minors || []).map((m) => ({
+              id: m.id,
+              first_name: m.first_name,
+              last_name: m.last_name,
+              dob: m.dob ? new Date(m.dob).toISOString().split("T")[0] : "",
+              checked: m.checked || m.status === 1,
+              isNew: m.isNew || false,
+            })),
+          }));
+        } else {
+          // Fetch from API
+          const response = await axios.get(endpoint);
+          data = response.data;
+          setCustomerData(data);
+          setForm((prev) => ({
+            ...prev,
+            date: new Date().toISOString().split("T")[0],
+            fullName: `${data.first_name} ${data.last_name}`,
+            minors: (data.minors || []).map((m) => ({
+              id: m.id,
+              first_name: m.first_name,
+              last_name: m.last_name,
+              dob: m.dob ? new Date(m.dob).toISOString().split("T")[0] : "",
+              checked: m.status === 1,
+              isNew: false,
+            })),
+          }));
+        }
 
-        setCustomerData(data);
-        setForm((prev) => ({
-          ...prev,
-          date: new Date().toISOString().split("T")[0],
-          fullName: `${data.first_name} ${data.last_name}`,
-          minors: (data.minors || []).map((m) => ({
-            id: m.id,
-            first_name: m.first_name,
-            last_name: m.last_name,
-            dob: m.dob ? new Date(m.dob).toISOString().split("T")[0] : "",
-            checked: m.status === 1,
-            isNew: false,
-          })),
-        }));
+        // Pre-fill signature for returning users
+        if (isReturning && customerId) {
+          try {
+            const signatureResponse = await axios.get(
+              `${BACKEND_URL}/api/waivers/get-signature?customerId=${customerId}`
+            );
+            if (signatureResponse.data?.signature) {
+              const signatureData = signatureResponse.data.signature;
+              setSignatureImage(signatureData);
+              
+              // Pre-fill the signature pad
+              setTimeout(() => {
+                if (sigPadRef.current) {
+                  try {
+                    sigPadRef.current.fromDataURL(signatureData);
+                  } catch (error) {
+                    console.error("Failed to pre-fill signature:", error);
+                  }
+                }
+              }, 100);
+            }
+          } catch (error) {
+            console.log("No previous signature found or error fetching:", error);
+            // Not a critical error, user can still sign manually
+          }
+        }
       } catch (error) {
         console.error("Failed to fetch customer data:", error);
         toast.error("Failed to load customer data.");
@@ -131,7 +178,7 @@ function Signature() {
     };
 
     fetchCustomer();
-  }, [phone]);
+  }, [phone, isReturning, customerId, location.state?.formData]);
 
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
@@ -310,28 +357,37 @@ function Signature() {
       return;
     }
 
-    // Automatically remove completely empty unchecked minors before validation
+    // For returning users: only include checked minors (unchecked minors are from previous visits)
+    // For new users: keep unchecked minors with data to trigger validation error
     const cleanedMinors = form.minors.filter(m => {
-      if (!m.checked) {
-        const hasData = m.first_name.trim() || m.last_name.trim() || m.dob;
-        return hasData;
+      if (isReturning) {
+        // For returning users, only include checked minors
+        return m.checked;
+      } else {
+        // For new users, remove only completely empty unchecked minors
+        if (!m.checked) {
+          const hasData = m.first_name.trim() || m.last_name.trim() || m.dob;
+          return hasData;
+        }
+        return true;
       }
-      return true;
     });
 
     // Update form with cleaned minors
     const updatedForm = { ...form, minors: cleanedMinors };
     setForm(updatedForm);
 
-    // Check if there are minors added but not checked
-    const uncheckedMinors = cleanedMinors.filter(m => !m.checked);
-    const uncheckedWithData = uncheckedMinors.filter(
-      m => m.first_name.trim() || m.last_name.trim() || m.dob
-    );
-    
-    if (uncheckedWithData.length > 0) {
-      toast.error(`You have added ${uncheckedWithData.length} minor(s) but haven't checked the box to include them. Please check the box next to each minor you want to include, or remove them.`);
-      return;
+    // Check if there are minors added but not checked (only for new users)
+    if (!isReturning) {
+      const uncheckedMinors = cleanedMinors.filter(m => !m.checked);
+      const uncheckedWithData = uncheckedMinors.filter(
+        m => m.first_name.trim() || m.last_name.trim() || m.dob
+      );
+      
+      if (uncheckedWithData.length > 0) {
+        toast.error(`You have added ${uncheckedWithData.length} minor(s) but haven't checked the box to include them. Please check the box next to each minor you want to include, or remove them.`);
+        return;
+      }
     }
 
     const checkedMinors = cleanedMinors.filter(m => m.checked);
@@ -602,7 +658,8 @@ CONTENTS AND VOLUNTARILY AGREE TO ITS TERMS  </p>
 SIGNING THIS WAIVER I AM WAIVING CERTIAN LEGAL RIGHTS WHICH I OR MY HEIRS, NEXT OF KIN, EXECUTORS, 
 AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
 
-            {form.minors.map((minor, index) => (
+            {!isReturning && <h5 className="mt-4 mb-3">Please check mark to sign on behalf of the below minor or dependent</h5>}
+            {form.minors.filter(minor => isReturning ? minor.checked : true).map((minor, index) => (
               <div key={index} className="minor-group my-3 p-3 border rounded" style={{ backgroundColor: minor.checked ? '#f0f8ff' : '#fff' }}>
                 <div className="d-flex gap-2 align-items-start w-100">
                   <div className="form-check mt-2">
@@ -680,9 +737,11 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
               </div>
             ))}
 
-            <button className="btn btn-secondary my-2 no-print" onClick={handleAddMinor}>
-              Add another minor
-            </button>
+            {!isReturning && (
+              <button className="btn btn-secondary my-2 no-print" onClick={handleAddMinor}>
+                Add another minor
+              </button>
+            )}
 
               {/* <div className="mt-3 mb-4 no-print">
                 <label>

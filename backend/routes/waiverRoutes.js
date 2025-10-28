@@ -8,6 +8,7 @@ router.get('/customer-info-by-id', waiverController.getCustomerInfoById);
 router.get('/customer-dashboard', waiverController.getCustomerDashboard);
 router.post('/update-customer', waiverController.updateCustomer);
 router.post('/save-signature', waiverController.saveSignature);
+router.get('/get-signature', waiverController.getSignature);
 router.post('/accept-rules', waiverController.acceptRules);
 router.get('/getminors', waiverController.getMinors);
 router.get('/getAllCustomers', waiverController.getAllCustomers);

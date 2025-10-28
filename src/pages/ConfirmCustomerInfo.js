@@ -15,6 +15,7 @@ function ConfirmCustomerInfo() {
   const [minorList, setMinorList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [minorErrors, setMinorErrors] = useState({});
 
 
   useEffect(() => {
@@ -67,7 +68,7 @@ function ConfirmCustomerInfo() {
           setLoading(false);
         });
     }
-  }, [phone]);
+  }, [phone, customerId]);
 
   // const handleChange = (e) => {
   //   const { name, value, type } = e.target;
@@ -94,7 +95,97 @@ function ConfirmCustomerInfo() {
     }
   };
 
+  const validateMinorField = (index, field, value) => {
+    const errorKey = `${index}_${field}`;
+    const errors = { ...minorErrors };
+    
+    if (field === 'first_name' || field === 'last_name') {
+      if (!value || value.trim() === '') {
+        errors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name is required`;
+      } else if (value.trim().length < 2) {
+        errors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name must be at least 2 characters`;
+      } else {
+        delete errors[errorKey];
+      }
+    } else if (field === 'dob') {
+      if (!value) {
+        errors[errorKey] = 'Date of birth is required';
+      } else {
+        const dobDate = new Date(value);
+        const today = new Date();
+        if (dobDate > today) {
+          errors[errorKey] = 'Date of birth cannot be in the future';
+        } else {
+          delete errors[errorKey];
+        }
+      }
+    }
+    
+    setMinorErrors(errors);
+  };
+
+  const handleMinorChange = (index, field, value) => {
+    const updated = [...minorList];
+    updated[index][field] = value;
+    setMinorList(updated);
+    
+    // Only validate new minors
+    if (updated[index].isNew) {
+      validateMinorField(index, field, value);
+    }
+  };
+
+  const removeMinor = (index) => {
+    const updated = [...minorList];
+    updated.splice(index, 1);
+    setMinorList(updated);
+    
+    // Clear validation errors for removed minor and reindex errors
+    const newErrors = {};
+    Object.keys(minorErrors).forEach(key => {
+      const [errorIndex, field] = key.split('_');
+      const idx = parseInt(errorIndex);
+      if (idx < index) {
+        newErrors[key] = minorErrors[key];
+      } else if (idx > index) {
+        newErrors[`${idx - 1}_${field}`] = minorErrors[key];
+      }
+    });
+    setMinorErrors(newErrors);
+  };
+
   const goToSignature = async () => {
+    // Check for inline validation errors
+    const hasErrors = Object.keys(minorErrors).length > 0;
+    if (hasErrors) {
+      toast.error("Please fix all validation errors before continuing.");
+      return;
+    }
+
+    // Validate new minors have all required fields
+    const newMinors = minorList.filter(minor => minor.isNew);
+    const invalidNewMinors = newMinors.filter(
+      minor => !minor.first_name?.trim() || !minor.last_name?.trim() || !minor.dob
+    );
+    
+    if (invalidNewMinors.length > 0) {
+      toast.error("Please complete all fields (first name, last name, and date of birth) for all new minors before continuing.");
+      return;
+    }
+
+    // Validate dates are not in the future
+    const minorsWithFutureDOB = newMinors.filter(minor => {
+      if (!minor.dob) return false;
+      const dobDate = new Date(minor.dob);
+      const today = new Date();
+      return dobDate > today;
+    });
+
+    if (minorsWithFutureDOB.length > 0) {
+      toast.error("Date of birth cannot be in the future for any minor.");
+      return;
+    }
+
     setUpdating(true);
     try {
        const stripMask = (val) => (val ? val.replace(/\D/g, "") : "");
@@ -245,70 +336,81 @@ function ConfirmCustomerInfo() {
                 <h5>Please check mark to sign on behalf of the below minor or dependent</h5>
 
                 {minorList.map((minor, index) => (
-                  <div key={index} className="minor-group d-flex align-items-center gap-2 my-2">
-                    <label className="custom-checkbox-wrapper">
-                      <input
-                        type="checkbox"
-                        className="custom-checkbox"
-                      checked={minor.checked}
-                        onChange={(e) => {
-                          const updated = [...minorList];
-                          updated[index].checked = e.target.checked;
-                          setMinorList(updated);
-                        }}
-                      />
-                    </label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="First Name"
-                      value={minor.first_name}
-                      onChange={(e) => {
-                        const updated = [...minorList];
-                        updated[index].first_name = e.target.value;
-                        setMinorList(updated);
-                      }}
-                      readOnly={!minor.isNew}
-                      style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
-                    />
-                    <input
-                      type="text"
-                      className="form-control"
-                        placeholder="Last Name"
-                      value={minor.last_name}
-                      onChange={(e) => {
-                        const updated = [...minorList];
-                        updated[index].last_name = e.target.value;
-                        setMinorList(updated);
-                      }}
-                      readOnly={!minor.isNew}
-                      style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
-                    />
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={minor.dob}
-                      onChange={(e) => {
-                        const updated = [...minorList];
-                        updated[index].dob = e.target.value;
-                        setMinorList(updated);
-                      }}
-                      readOnly={!minor.isNew}
-                      style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
-                    />
-                    {minor.isNew && (
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => {
-                          const updated = [...minorList];
-                          updated.splice(index, 1);
-                          setMinorList(updated);
-                        }}
-                      >
-                        Remove
-                      </button>
-                    )}
+                  <div key={index} className="minor-group my-3">
+                    <div className="d-flex align-items-start gap-2">
+                      <label className="custom-checkbox-wrapper mt-2">
+                        <input
+                          type="checkbox"
+                          className="custom-checkbox"
+                          checked={minor.checked}
+                          onChange={(e) => {
+                            const updated = [...minorList];
+                            updated[index].checked = e.target.checked;
+                            setMinorList(updated);
+                          }}
+                        />
+                      </label>
+                      
+                      <div className="flex-fill">
+                        <div className="row g-2">
+                          <div className="col-md-4">
+                            <input
+                              type="text"
+                              className={`form-control ${minorErrors[`${index}_first_name`] ? 'is-invalid' : ''}`}
+                              placeholder="First Name"
+                              value={minor.first_name}
+                              onChange={(e) => handleMinorChange(index, 'first_name', e.target.value)}
+                              readOnly={!minor.isNew}
+                              style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
+                            />
+                            {minorErrors[`${index}_first_name`] && (
+                              <div className="text-danger small mt-1">{minorErrors[`${index}_first_name`]}</div>
+                            )}
+                          </div>
+                          
+                          <div className="col-md-4">
+                            <input
+                              type="text"
+                              className={`form-control ${minorErrors[`${index}_last_name`] ? 'is-invalid' : ''}`}
+                              placeholder="Last Name"
+                              value={minor.last_name}
+                              onChange={(e) => handleMinorChange(index, 'last_name', e.target.value)}
+                              readOnly={!minor.isNew}
+                              style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
+                            />
+                            {minorErrors[`${index}_last_name`] && (
+                              <div className="text-danger small mt-1">{minorErrors[`${index}_last_name`]}</div>
+                            )}
+                          </div>
+                          
+                          <div className="col-md-3">
+                            <input
+                              type="date"
+                              className={`form-control ${minorErrors[`${index}_dob`] ? 'is-invalid' : ''}`}
+                              value={minor.dob}
+                              onChange={(e) => handleMinorChange(index, 'dob', e.target.value)}
+                              readOnly={!minor.isNew}
+                              style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
+                            />
+                            {minorErrors[`${index}_dob`] && (
+                              <div className="text-danger small mt-1">{minorErrors[`${index}_dob`]}</div>
+                            )}
+                          </div>
+                          
+                          {minor.isNew && (
+                            <div className="col-md-1">
+                              <button
+                                type="button"
+                                className="btn btn-danger"
+                                onClick={() => removeMinor(index)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
 
