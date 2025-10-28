@@ -79,47 +79,59 @@ function UserDashboard() {
   };
 
   return (
-    <div className="container-fluid">
-      <div className="container">
-        <div className="row my-4">
-          <div className="col-md-2">
-            <div className="back-btn">
-              <Link to="/">
-                <img
-                  className="img-fluid"
-                  src="/assets/img/image 298.png"
-                  alt="back"
-                />
-                {" "}BACK
-              </Link>
+    <div className="container-fluid" style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
+      <div className="container py-4">
+        {/* Header Section */}
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div className="back-btn">
+                <Link to="/" className="text-decoration-none">
+                  <img
+                    className="img-fluid"
+                    src="/assets/img/image 298.png"
+                    alt="back"
+                    style={{ width: '20px', marginRight: '8px' }}
+                  />
+                  BACK
+                </Link>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="col-12 col-md-10 mx-auto">
+        {/* Logo and Title Section */}
+        <div className="row">
+          <div className="col-12">
             <div className="text-center mb-4">
-              <div className="logo mb-3">
+              <div className="logo mb-3 d-flex justify-content-center">
                 <img
                   className="img-fluid"
                   src="/assets/img/SKATE_AND_PLAY_V08_Full_Transparency (2) 1.png"
-                  alt="logo"
-                  style={{ maxWidth: "300px" }}
+                  alt="Skate & Play Logo"
+                  style={{ maxWidth: "300px", width: '100%', height: 'auto' }}
                 />
               </div>
-              <h2 className="h5-heading">My Visit History</h2>
-              <p className="text-muted">
-                Phone: {formatPhone(phone)}
+              <h2 className="mb-2" style={{ fontSize: '1.75rem', fontWeight: '600' }}>My Visit History</h2>
+              <p className="text-muted mb-1">
+                Phone: <strong>{formatPhone(phone)}</strong>
               </p>
               {customerVisits.length > 0 && (
-                <p className="text-primary">
+                <p className="text-primary mb-0">
                   <strong>{customerVisits.length}</strong> visit{customerVisits.length !== 1 ? 's' : ''} found
                 </p>
               )}
             </div>
+          </div>
+        </div>
 
+        {/* Content Section */}
+        <div className="row">
+          <div className="col-12 col-lg-10 mx-auto">
             {loading ? (
               <div className="mt-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="card mb-3">
+                  <div key={i} className="card mb-3 shadow-sm">
                     <div className="card-body">
                       <Skeleton height={30} width="60%" />
                       <Skeleton height={20} width="40%" className="mt-2" />
@@ -129,21 +141,22 @@ function UserDashboard() {
                 ))}
               </div>
             ) : customerVisits.length === 0 ? (
-              <div className="text-center mt-5">
+              <div className="text-center mt-5 py-5">
                 <img
                   src="/assets/img/image 303.png"
                   alt="No visits"
-                  className="img-fluid mb-3"
+                  className="img-fluid mb-4"
                   style={{ maxWidth: "200px" }}
                 />
-                <h5>No Visits Found</h5>
-                <p className="text-muted">No visit history found for this phone number.</p>
-                <Link to="/new-customer" className="btn btn-primary mt-3">
+                <h5 className="mb-3">No Visits Found</h5>
+                <p className="text-muted mb-4">No visit history found for this phone number.</p>
+                <Link to="/new-customer" className="btn btn-primary">
+                  <i className="fas fa-plus me-2"></i>
                   Sign a New Waiver
                 </Link>
               </div>
             ) : (
-              <div className="row">
+              <>
                 {customerVisits.map((customer, index) => {
                   const isExpanded = expandedVisits[customer.id];
                   const latestWaiver = customer.waivers && customer.waivers.length > 0 
@@ -151,20 +164,18 @@ function UserDashboard() {
                     : null;
                   
                   return (
-                    <div key={customer.id} className="col-12 mb-3">
-                      <div className="card shadow-sm">
-                        <div className="card-body">
-                          {/* Header: Visit number and date */}
-                          <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div>
-                              <h5 className="card-title mb-1">
+                    <div key={customer.id} className="mb-4">
+                      <div className="card shadow-sm border-0" style={{ borderRadius: '12px', overflow: 'hidden' }}>
+                        <div className="card-body p-4">
+                          {/* Header: Visit number, date, and status */}
+                          <div className="d-flex justify-content-between align-items-start mb-4">
+                            <div className="flex-grow-1">
+                              <h5 className="mb-1" style={{ fontSize: '1.25rem', fontWeight: '600', color: '#333' }}>
                                 Visit #{customerVisits.length - index}
                               </h5>
-                              <p className="text-muted mb-0">
-                                <small>
-                                  <i className="fas fa-calendar me-1"></i>
-                                  {formatDate(customer.created_at)}
-                                </small>
+                              <p className="text-muted mb-0" style={{ fontSize: '0.9rem' }}>
+                                <i className="fas fa-calendar me-2"></i>
+                                {formatDate(customer.created_at)}
                               </p>
                             </div>
                             {latestWaiver && (
@@ -172,43 +183,51 @@ function UserDashboard() {
                             )}
                           </div>
 
-                          {/* Customer Info Summary */}
-                          <div className="border-top pt-3">
-                            <div className="row">
-                              <div className="col-md-6">
-                                <p className="mb-2">
-                                  <strong>
+                          {/* Customer Info Grid */}
+                          <div className="border-top pt-3 mb-3">
+                            <div className="row g-3">
+                              <div className="col-12 col-md-6">
+                                <div className="mb-3">
+                                  <p className="mb-1" style={{ fontSize: '0.85rem', color: '#6c757d' }}>
                                     <i className="fas fa-user me-2 text-primary"></i>
                                     Name:
-                                  </strong>{" "}
-                                  {customer.first_name} {customer.last_name}
-                                </p>
+                                  </p>
+                                  <p className="mb-0 ms-4" style={{ fontWeight: '500' }}>
+                                    {customer.first_name} {customer.last_name}
+                                  </p>
+                                </div>
                                 {customer.email && (
-                                  <p className="mb-2">
-                                    <strong>
+                                  <div className="mb-3">
+                                    <p className="mb-1" style={{ fontSize: '0.85rem', color: '#6c757d' }}>
                                       <i className="fas fa-envelope me-2 text-primary"></i>
                                       Email:
-                                    </strong>{" "}
-                                    {customer.email}
-                                  </p>
+                                    </p>
+                                    <p className="mb-0 ms-4" style={{ fontWeight: '500' }}>
+                                      {customer.email}
+                                    </p>
+                                  </div>
                                 )}
                               </div>
-                              <div className="col-md-6">
-                                <p className="mb-2">
-                                  <strong>
+                              <div className="col-12 col-md-6">
+                                <div className="mb-3">
+                                  <p className="mb-1" style={{ fontSize: '0.85rem', color: '#6c757d' }}>
                                     <i className="fas fa-map-marker-alt me-2 text-primary"></i>
                                     Address:
-                                  </strong>{" "}
-                                  {customer.address}
-                                </p>
+                                  </p>
+                                  <p className="mb-0 ms-4" style={{ fontWeight: '500' }}>
+                                    {customer.address}
+                                  </p>
+                                </div>
                                 {customer.city && customer.province && (
-                                  <p className="mb-2">
-                                    <strong>
+                                  <div className="mb-3">
+                                    <p className="mb-1" style={{ fontSize: '0.85rem', color: '#6c757d' }}>
                                       <i className="fas fa-map-pin me-2 text-primary"></i>
                                       Location:
-                                    </strong>{" "}
-                                    {customer.city}, {customer.province} {customer.postal_code}
-                                  </p>
+                                    </p>
+                                    <p className="mb-0 ms-4" style={{ fontWeight: '500' }}>
+                                      {customer.city}, {customer.province} {customer.postal_code}
+                                    </p>
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -217,25 +236,27 @@ function UserDashboard() {
                           {/* Minors Summary */}
                           {latestWaiver && latestWaiver.minors && latestWaiver.minors.length > 0 && (
                             <div className="mt-3 border-top pt-3">
-                              <p className="mb-2">
-                                <strong>
-                                  <i className="fas fa-child me-2 text-primary"></i>
-                                  Minors Included ({latestWaiver.minors.length}):
-                                </strong>
+                              <p className="mb-2" style={{ fontSize: '0.9rem', fontWeight: '600' }}>
+                                <i className="fas fa-child me-2 text-primary"></i>
+                                Minors Included ({latestWaiver.minors.length}):
                               </p>
-                              <ul className="list-unstyled ms-4">
+                              <div className="ms-4">
                                 {latestWaiver.minors.map((minor, idx) => (
-                                  <li key={idx} className="mb-1">
-                                    <i className="fas fa-user-friends text-secondary me-2"></i>
-                                    {minor.first_name} {minor.last_name}
-                                    {minor.dob && (
-                                      <span className="text-muted ms-2">
-                                        (DOB: {new Date(minor.dob).toLocaleDateString()})
+                                  <div key={idx} className="mb-2 d-flex align-items-start">
+                                    <i className="fas fa-user-friends text-secondary me-2 mt-1"></i>
+                                    <div>
+                                      <span style={{ fontWeight: '500' }}>
+                                        {minor.first_name} {minor.last_name}
                                       </span>
-                                    )}
-                                  </li>
+                                      {minor.dob && (
+                                        <span className="text-muted ms-2" style={{ fontSize: '0.85rem' }}>
+                                          (DOB: {new Date(minor.dob).toLocaleDateString()})
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 ))}
-                              </ul>
+                              </div>
                             </div>
                           )}
 
@@ -299,19 +320,28 @@ function UserDashboard() {
                     </div>
                   );
                 })}
-              </div>
+                
+                {/* Action Buttons */}
+                <div className="text-center mt-5 mb-4">
+                  <Link 
+                    to="/new-customer" 
+                    className="btn btn-primary me-2 px-4 py-2" 
+                    style={{ borderRadius: '8px', fontWeight: '500' }}
+                  >
+                    <i className="fas fa-plus me-2"></i>
+                    Sign New Waiver
+                  </Link>
+                  <Link 
+                    to="/" 
+                    className="btn btn-outline-secondary px-4 py-2" 
+                    style={{ borderRadius: '8px', fontWeight: '500' }}
+                  >
+                    <i className="fas fa-home me-2"></i>
+                    Home
+                  </Link>
+                </div>
+              </>
             )}
-
-            <div className="text-center mt-4 mb-5">
-              <Link to="/new-customer" className="btn btn-primary me-2">
-                <i className="fas fa-plus me-2"></i>
-                Sign New Waiver
-              </Link>
-              <Link to="/" className="btn btn-outline-secondary">
-                <i className="fas fa-home me-2"></i>
-                Home
-              </Link>
-            </div>
           </div>
         </div>
       </div>

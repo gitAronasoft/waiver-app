@@ -18,6 +18,7 @@ function Signature() {
   const [customerData, setCustomerData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [minorErrors, setMinorErrors] = useState({});
 
   const customerType = location.state?.customerType || "existing";
   const phone = location.state?.phone;
@@ -140,12 +141,46 @@ function Signature() {
     persistToLocalStorage(updated);
   };
 
+  const validateMinorField = (index, field, value) => {
+    const errors = { ...minorErrors };
+    const errorKey = `${index}_${field}`;
+    
+    if (field === 'first_name' || field === 'last_name') {
+      if (value.trim() === '') {
+        errors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name is required`;
+      } else if (value.trim().length < 2) {
+        errors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name must be at least 2 characters`;
+      } else {
+        delete errors[errorKey];
+      }
+    } else if (field === 'dob') {
+      if (!value) {
+        errors[errorKey] = 'Date of birth is required';
+      } else {
+        const dobDate = new Date(value);
+        const today = new Date();
+        if (dobDate > today) {
+          errors[errorKey] = 'Date of birth cannot be in the future';
+        } else {
+          delete errors[errorKey];
+        }
+      }
+    }
+    
+    setMinorErrors(errors);
+  };
+
   const handleMinorChange = (index, field, value) => {
     const minors = [...form.minors];
     minors[index][field] = value;
     const updated = { ...form, minors };
     setForm(updated);
     persistToLocalStorage(updated);
+    
+    // Validate the field if it's checked
+    if (minors[index].checked) {
+      validateMinorField(index, field, value);
+    }
   };
 
   const handleMinorCheckbox = (index) => {
@@ -154,6 +189,53 @@ function Signature() {
     const updated = { ...form, minors };
     setForm(updated);
     persistToLocalStorage(updated);
+    
+    // Update validation errors in a single batch
+    setMinorErrors(prevErrors => {
+      const errors = { ...prevErrors };
+      
+      if (minors[index].checked) {
+        // If checking the box, validate all fields immediately
+        const fields = [
+          { name: 'first_name', value: minors[index].first_name, label: 'First' },
+          { name: 'last_name', value: minors[index].last_name, label: 'Last' },
+          { name: 'dob', value: minors[index].dob, label: 'DOB' }
+        ];
+        
+        fields.forEach(({ name, value, label }) => {
+          const errorKey = `${index}_${name}`;
+          
+          if (name === 'first_name' || name === 'last_name') {
+            if (!value || value.trim() === '') {
+              errors[errorKey] = `${label} name is required`;
+            } else if (value.trim().length < 2) {
+              errors[errorKey] = `${label} name must be at least 2 characters`;
+            } else {
+              delete errors[errorKey];
+            }
+          } else if (name === 'dob') {
+            if (!value) {
+              errors[errorKey] = 'Date of birth is required';
+            } else {
+              const dobDate = new Date(value);
+              const today = new Date();
+              if (dobDate > today) {
+                errors[errorKey] = 'Date of birth cannot be in the future';
+              } else {
+                delete errors[errorKey];
+              }
+            }
+          }
+        });
+      } else {
+        // If unchecking, clear validation errors for this minor
+        delete errors[`${index}_first_name`];
+        delete errors[`${index}_last_name`];
+        delete errors[`${index}_dob`];
+      }
+      
+      return errors;
+    });
   };
 
   const handleAddMinor = () => {
@@ -174,6 +256,39 @@ function Signature() {
     const updated = { ...form, minors };
     setForm(updated);
     persistToLocalStorage(updated);
+    
+    // Clear all validation errors and rebuild for remaining minors
+    const newErrors = {};
+    minors.forEach((minor, newIndex) => {
+      if (minor.checked) {
+        // Re-validate remaining checked minors with their new indices
+        const fields = ['first_name', 'last_name', 'dob'];
+        fields.forEach(field => {
+          const errorKey = `${newIndex}_${field}`;
+          const value = minor[field];
+          
+          if (field === 'first_name' || field === 'last_name') {
+            if (!value || value.trim() === '') {
+              newErrors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name is required`;
+            } else if (value.trim().length < 2) {
+              newErrors[errorKey] = `${field === 'first_name' ? 'First' : 'Last'} name must be at least 2 characters`;
+            }
+          } else if (field === 'dob') {
+            if (!value) {
+              newErrors[errorKey] = 'Date of birth is required';
+            } else {
+              const dobDate = new Date(value);
+              const today = new Date();
+              if (dobDate > today) {
+                newErrors[errorKey] = 'Date of birth cannot be in the future';
+              }
+            }
+          }
+        });
+      }
+    });
+    
+    setMinorErrors(newErrors);
   };
 
   const handleClearSignature = () => {
@@ -190,6 +305,17 @@ function Signature() {
 
     if (sigPadRef.current.isEmpty()) {
       toast.error("Please provide your signature before continuing.");
+      return;
+    }
+
+    // Check if there are minors added but not checked
+    const uncheckedMinors = form.minors.filter(m => !m.checked);
+    const uncheckedWithData = uncheckedMinors.filter(
+      m => m.first_name.trim() || m.last_name.trim() || m.dob
+    );
+    
+    if (uncheckedWithData.length > 0) {
+      toast.error(`You have added ${uncheckedWithData.length} minor(s) but haven't checked the box to include them. Please check the box next to each minor you want to include, or remove them.`);
       return;
     }
 
@@ -453,35 +579,79 @@ SIGNING THIS WAIVER I AM WAIVING CERTIAN LEGAL RIGHTS WHICH I OR MY HEIRS, NEXT 
 AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
 
             {form.minors.map((minor, index) => (
-              <div key={index} className="minor-group d-flex gap-2 align-items-center my-2">
-                <input
-                  type="checkbox"
-                  checked={minor.checked}
-                  onChange={() => handleMinorCheckbox(index)}
-                />
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Minor First Name"
-                  value={minor.first_name}
-                  onChange={(e) => handleMinorChange(index, "first_name", e.target.value)}
-                />
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Minor Last Name"
-                  value={minor.last_name}
-                  onChange={(e) => handleMinorChange(index, "last_name", e.target.value)}
-                />
-                <input
-                  type="date"
-                  className="form-control"
-                  value={minor.dob}
-                  onChange={(e) => handleMinorChange(index, "dob", e.target.value)}
-                />
-                <button type="button" className="btn btn-danger no-print" onClick={() => handleRemoveMinor(index)}>
-                  Remove
-                </button>
+              <div key={index} className="minor-group my-3 p-3 border rounded" style={{ backgroundColor: minor.checked ? '#f0f8ff' : '#fff' }}>
+                <div className="d-flex gap-2 align-items-start">
+                  <div className="form-check mt-2">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                      checked={minor.checked}
+                      onChange={() => handleMinorCheckbox(index)}
+                      id={`minor-check-${index}`}
+                    />
+                    <label className="form-check-label ms-1" htmlFor={`minor-check-${index}`} style={{ fontSize: '12px' }}>
+                      Include
+                    </label>
+                  </div>
+                  
+                  <div className="flex-grow-1">
+                    <div className="row g-2">
+                      <div className="col-md-4">
+                        <input
+                          type="text"
+                          className={`form-control ${minorErrors[`${index}_first_name`] ? 'is-invalid' : ''}`}
+                          placeholder="Minor First Name *"
+                          value={minor.first_name}
+                          onChange={(e) => handleMinorChange(index, "first_name", e.target.value)}
+                        />
+                        {minorErrors[`${index}_first_name`] && (
+                          <div className="invalid-feedback d-block">
+                            {minorErrors[`${index}_first_name`]}
+                          </div>
+                        )}
+                      </div>
+                      <div className="col-md-4">
+                        <input
+                          type="text"
+                          className={`form-control ${minorErrors[`${index}_last_name`] ? 'is-invalid' : ''}`}
+                          placeholder="Minor Last Name *"
+                          value={minor.last_name}
+                          onChange={(e) => handleMinorChange(index, "last_name", e.target.value)}
+                        />
+                        {minorErrors[`${index}_last_name`] && (
+                          <div className="invalid-feedback d-block">
+                            {minorErrors[`${index}_last_name`]}
+                          </div>
+                        )}
+                      </div>
+                      <div className="col-md-4">
+                        <input
+                          type="date"
+                          className={`form-control ${minorErrors[`${index}_dob`] ? 'is-invalid' : ''}`}
+                          value={minor.dob}
+                          onChange={(e) => handleMinorChange(index, "dob", e.target.value)}
+                          placeholder="Date of Birth *"
+                        />
+                        {minorErrors[`${index}_dob`] && (
+                          <div className="invalid-feedback d-block">
+                            {minorErrors[`${index}_dob`]}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button type="button" className="btn btn-danger btn-sm no-print" onClick={() => handleRemoveMinor(index)}>
+                    Remove
+                  </button>
+                </div>
+                {!minor.checked && (minor.first_name || minor.last_name || minor.dob) && (
+                  <div className="alert alert-warning mt-2 mb-0 py-2 px-3" style={{ fontSize: '13px' }}>
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    Don't forget to check the box to include this minor in the waiver!
+                  </div>
+                )}
               </div>
             ))}
 
