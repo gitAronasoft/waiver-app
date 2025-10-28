@@ -163,11 +163,11 @@ function UserDashboard() {
                     <table className="table table-hover mb-0" style={{ fontSize: '0.9rem' }}>
                       <thead style={{ background: 'linear-gradient(135deg, #6C5CE7 0%, #8B7FE8 100%)', borderBottom: '3px solid #6C5CE7' }}>
                         <tr>
-                          <th className="py-3 px-3" style={{ fontWeight: '600', color: '#fff', width: '15%' }}>Visit #</th>
-                          <th className="py-3 px-3" style={{ fontWeight: '600', color: '#fff', width: '25%' }}>Name</th>
-                          <th className="py-3 px-3" style={{ fontWeight: '600', color: '#fff', width: '30%' }}>Date & Time</th>
-                          <th className="py-3 px-3" style={{ fontWeight: '600', color: '#fff', width: '15%' }}>Minors</th>
-                          <th className="py-3 px-3 text-center" style={{ fontWeight: '600', color: '#fff', width: '15%' }}>Status</th>
+                          <th className="py-3 px-3" style={{ fontWeight: '600', width: '15%' }}>Visit #</th>
+                          <th className="py-3 px-3" style={{ fontWeight: '600', width: '25%' }}>Name</th>
+                          <th className="py-3 px-3" style={{ fontWeight: '600', width: '30%' }}>Date & Time</th>
+                          <th className="py-3 px-3" style={{ fontWeight: '600', width: '15%' }}>Minors</th>
+                          <th className="py-3 px-3 text-center" style={{ fontWeight: '600', width: '15%' }}>Status</th>
                         </tr>
                       </thead>
                       <tbody>

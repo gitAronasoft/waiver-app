@@ -12,6 +12,9 @@ function AllDone() {
   };
 
   useEffect(() => {
+    // Clear localStorage when component mounts
+    localStorage.removeItem("signatureForm");
+    
     // Countdown timer
     const interval = setInterval(() => {
       setCountdown((prev) => {

@@ -28,7 +28,7 @@ function Signature() {
   const [form, setForm] = useState({
     date: "",
     fullName: "",
-    consented: false,
+    consented: isReturning,
     subscribed: false,
     minors: [],
   });
@@ -602,7 +602,7 @@ CONTENTS AND VOLUNTARILY AGREE TO ITS TERMS  </p>
 SIGNING THIS WAIVER I AM WAIVING CERTIAN LEGAL RIGHTS WHICH I OR MY HEIRS, NEXT OF KIN, EXECUTORS, 
 AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
 
-            {!isReturning && form.minors.map((minor, index) => (
+            {form.minors.map((minor, index) => (
               <div key={index} className="minor-group my-3 p-3 border rounded" style={{ backgroundColor: minor.checked ? '#f0f8ff' : '#fff' }}>
                 <div className="d-flex gap-2 align-items-start w-100">
                   <div className="form-check mt-2">
@@ -626,6 +626,8 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                           placeholder="Minor First Name *"
                           value={minor.first_name}
                           onChange={(e) => handleMinorChange(index, "first_name", e.target.value)}
+                          readOnly={!minor.isNew}
+                          style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
                         />
                         {minorErrors[`${index}_first_name`] && (
                           <div className="invalid-feedback d-block">
@@ -640,6 +642,8 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                           placeholder="Minor Last Name *"
                           value={minor.last_name}
                           onChange={(e) => handleMinorChange(index, "last_name", e.target.value)}
+                          readOnly={!minor.isNew}
+                          style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
                         />
                         {minorErrors[`${index}_last_name`] && (
                           <div className="invalid-feedback d-block">
@@ -654,6 +658,8 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                           value={minor.dob}
                           onChange={(e) => handleMinorChange(index, "dob", e.target.value)}
                           placeholder="Date of Birth *"
+                          readOnly={!minor.isNew}
+                          style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
                         />
                         {minorErrors[`${index}_dob`] && (
                           <div className="invalid-feedback d-block">
@@ -662,9 +668,11 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                         )}
                       </div>
                       <div className="col-md-3 col-sm-6 d-flex align-items-start">
-                        <button type="button" className="btn btn-danger btn-sm no-print w-100" onClick={() => handleRemoveMinor(index)}>
-                          Remove
-                        </button>
+                        {minor.isNew && (
+                          <button type="button" className="btn btn-danger btn-sm no-print w-100" onClick={() => handleRemoveMinor(index)}>
+                            Remove
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -672,11 +680,9 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
               </div>
             ))}
 
-            {!isReturning && (
-              <button className="btn btn-secondary my-2 no-print" onClick={handleAddMinor}>
-                Add another minor
-              </button>
-            )}
+            <button className="btn btn-secondary my-2 no-print" onClick={handleAddMinor}>
+              Add another minor
+            </button>
 
               {/* <div className="mt-3 mb-4 no-print">
                 <label>

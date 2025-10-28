@@ -142,7 +142,7 @@ function ConfirmCustomerInfo() {
         <div className="row">
           <div className="col-md-2">
             <div className="back-btn">
-              <Link to="/existing-customer">
+              <Link to={isReturning ? "/user-dashboard" : "/existing-customer"} state={{ phone }}>
                 <img className="img-fluid" src="/assets/img/image 298.png" alt="back-icon" /> BACK
               </Link>
             </div>
@@ -167,31 +167,31 @@ function ConfirmCustomerInfo() {
                     <tr>
                       <td>
                         Participant First Name:<br />
-                        <input type="text" name="first_name" value={formData.first_name || ""} onChange={handleChange} className="form-control" readOnly/>
+                        <input type="text" name="first_name" value={formData.first_name || ""} onChange={handleChange} className="form-control" readOnly style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}/>
                       </td>
                       <td>
                         Participant Last Name:<br />
-                        <input type="text" name="last_name" value={formData.last_name || ""} onChange={handleChange} className="form-control" readOnly />
+                        <input type="text" name="last_name" value={formData.last_name || ""} onChange={handleChange} className="form-control" readOnly style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }} />
                       </td>
                     
                       <td>
                         Date of Birth:<br />
-                        <input type="date" name="dob" value={formData.dob || ""} onChange={handleChange} className="form-control" readOnly/>
+                        <input type="date" name="dob" value={formData.dob || ""} onChange={handleChange} className="form-control" readOnly style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}/>
                       </td>
                      
                     </tr>
                     <tr>
                       <td>
                         Address:<br />
-                        <input type="text" name="address" value={formData.address || ""} onChange={handleChange} className="form-control" readOnly/>
+                        <input type="text" name="address" value={formData.address || ""} onChange={handleChange} className="form-control" readOnly style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}/>
                       </td>
                       <td>
                         City:<br />
-                        <input type="text" name="city" value={formData.city || ""} onChange={handleChange} className="form-control" readOnly/>
+                        <input type="text" name="city" value={formData.city || ""} onChange={handleChange} className="form-control" readOnly style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}/>
                       </td>
                       <td>
                         Province:<br />
-                        <input type="text" name="province" value={formData.province || ""} onChange={handleChange} className="form-control" readOnly/>
+                        <input type="text" name="province" value={formData.province || ""} onChange={handleChange} className="form-control" readOnly style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}/>
                       </td>
                     
                     </tr>
@@ -199,7 +199,7 @@ function ConfirmCustomerInfo() {
                  
                       <td>
                         Postal Code:<br />
-                        <input type="text" name="postal_code" value={formData.postal_code || ""} onChange={handleChange} className="form-control" readOnly/>
+                        <input type="text" name="postal_code" value={formData.postal_code || ""} onChange={handleChange} className="form-control" readOnly style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}/>
                       </td>
                       {/* <td>
                         Cell Phone:<br />
@@ -226,12 +226,13 @@ function ConfirmCustomerInfo() {
                           }
                           className="form-control"
                           readOnly
+                          style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}
                         />
                       </td>
                      
                       <td>
                         Email:<br />
-                        <input type="email" name="email" value={formData.email || ""} onChange={handleChange} className="form-control" readOnly/>
+                        <input type="email" name="email" value={formData.email || ""} onChange={handleChange} className="form-control" readOnly style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}/>
                       </td>
                      
                     </tr>
@@ -267,6 +268,8 @@ function ConfirmCustomerInfo() {
                         updated[index].first_name = e.target.value;
                         setMinorList(updated);
                       }}
+                      readOnly={!minor.isNew}
+                      style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
                     />
                     <input
                       type="text"
@@ -278,6 +281,8 @@ function ConfirmCustomerInfo() {
                         updated[index].last_name = e.target.value;
                         setMinorList(updated);
                       }}
+                      readOnly={!minor.isNew}
+                      style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
                     />
                     <input
                       type="date"
@@ -288,6 +293,8 @@ function ConfirmCustomerInfo() {
                         updated[index].dob = e.target.value;
                         setMinorList(updated);
                       }}
+                      readOnly={!minor.isNew}
+                      style={!minor.isNew ? { backgroundColor: '#e9ecef', cursor: 'not-allowed' } : {}}
                     />
                     {minor.isNew && (
                       <button
