@@ -256,7 +256,7 @@ function ConfirmCustomerInfo() {
           <div className="col-md-2">
             <div className="back-btn">
               <Link
-                to={isReturning ? "/my-waivers" : "/existing-customer"}
+                to="/my-waivers"
                 state={{ phone }}
               >
                 <img

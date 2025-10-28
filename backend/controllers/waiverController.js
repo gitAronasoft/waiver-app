@@ -486,12 +486,32 @@ const saveSignature = async (req, res) => {
       console.log(`🗑️ Deleted ${minorsToDelete.length} minor(s) from customer ${id}`);
     }
 
-    // Always create a NEW waiver form entry (for visit history tracking)
-    const [result] = await db.query(
-      "INSERT INTO waiver_forms (customer_id, signature_image, signed_at, completed) VALUES (?, ?, NOW(), 0)",
-      [id, signature],
+    // Update the existing waiver form (created during customer registration) with signature
+    // Find the most recent unsigned waiver for this customer
+    const [existingWaivers] = await db.query(
+      "SELECT id FROM waiver_forms WHERE customer_id = ? AND signed_at IS NULL ORDER BY created_at DESC LIMIT 1",
+      [id],
     );
-    const waiverId = result.insertId;
+
+    let waiverId;
+    
+    if (existingWaivers.length > 0) {
+      // Update existing waiver with signature
+      waiverId = existingWaivers[0].id;
+      await db.query(
+        "UPDATE waiver_forms SET signature_image = ?, signed_at = NOW() WHERE id = ?",
+        [signature, waiverId],
+      );
+      console.log(`✅ Updated waiver ${waiverId} with signature for customer ${id}`);
+    } else {
+      // Fallback: Create new waiver if none exists (shouldn't happen in normal flow)
+      const [result] = await db.query(
+        "INSERT INTO waiver_forms (customer_id, signature_image, signed_at, completed) VALUES (?, ?, NOW(), 0)",
+        [id, signature],
+      );
+      waiverId = result.insertId;
+      console.log(`✅ Created new waiver ${waiverId} with signature for customer ${id}`);
+    }
 
     // Minors are already linked to customer via customer_id, no junction table needed
     console.log(`✅ Signature saved for waiver ${waiverId}`);

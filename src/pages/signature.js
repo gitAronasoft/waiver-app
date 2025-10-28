@@ -243,16 +243,22 @@ function Signature() {
   };
 
   const handleSubmit = async () => {
+    // Prevent multiple submissions immediately
+    if (submitting) return;
+    setSubmitting(true);
+
     // Clear previous errors
     setMinorErrors({});
 
     if (!form.consented) {
       toast.error("Please agree to the terms by checking the consent box.");
+      setSubmitting(false);
       return;
     }
 
     if (sigPadRef.current.isEmpty()) {
       toast.error("Please provide your signature before continuing.");
+      setSubmitting(false);
       return;
     }
 
@@ -303,6 +309,7 @@ function Signature() {
     if (hasErrors) {
       setMinorErrors(validationErrors);
       toast.error("Please complete all required information for minors correctly.");
+      setSubmitting(false);
       return;
     }
 
@@ -314,8 +321,6 @@ function Signature() {
     // Update form with cleaned minors
     const updatedForm = { ...form, minors: cleanedMinors };
     setForm(updatedForm);
-
-    setSubmitting(true);
 
     //const signatureData = sigPadRef.current.getCanvas().toDataURL("image/png");
     // const signatureData = sigPadRef.current.getCanvas().toDataURL("image/jpeg", 0.6); // ✅ Compress signature
