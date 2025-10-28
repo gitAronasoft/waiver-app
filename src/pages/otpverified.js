@@ -64,10 +64,9 @@ const verifyOtp = async (otpValue) => {
     if (res.data.authenticated) {
       toast.success("OTP Verified Successfully!");
 
-      if (customerType === "dashboard") {
+      if (customerType === "dashboard" || customerType === "existing") {
+        // Both existing customer and dashboard go to history dashboard
         navigate("/my-waivers", { state: { phone } });
-      } else if (customerType === "existing") {
-        navigate("/confirm-info", { state: { phone } });
       } else if (customerType === "new") {
         navigate("/signature", { state: { phone } });
       }

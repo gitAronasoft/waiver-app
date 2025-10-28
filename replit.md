@@ -6,20 +6,45 @@ This project is a full-stack waiver management system designed for Skate & Play.
 ## User Preferences
 I prefer simple language in explanations. I want iterative development, with frequent, small updates rather than large, infrequent ones. Please ask before making major changes or architectural decisions. Do not make changes to the `Backend-old` folder or any duplicate components.
 
-## Recent Changes (October 27, 2025)
-- **Customer History Preservation Bug Fix**: Fixed critical bug where "New Waiver" signups with existing phone numbers were overwriting customer data. The system now:
-  - Preserves original customer information (name, DOB, address) when phone number already exists
-  - Does not delete or modify existing minors when creating new waivers
-  - Creates new waiver_form entries without destroying history
-  - Allows users to see complete waiver history when logging in via "Existing Customer"
-  - Note: Minors are linked to customer accounts (not individual waivers) and should be managed via "Existing Customer" flow
-- **Signature Page Data Loading**: Fixed `getMinors` endpoint to return complete customer information (first_name, last_name, dob, address, etc.) along with minors, resolving issue where signature page showed blank fields after OTP verification.
-- **Minor Management Functionality**: Implemented complete add/update/delete operations for minors in `saveSignature` endpoint. The system now properly:
-  - Adds new minors to the database
-  - Updates existing minors when modified
-  - Deletes minors that are removed from the UI
-  - Honors check/uncheck status for each minor
-  - Ensures UI changes persist correctly across page reloads
+## Recent Changes (October 28, 2025 - Major Architecture Refactor)
+- **Multi-Customer-Per-Phone Architecture**: Completely refactored the system to support multiple customer records with the same phone number. The system now:
+  - **Always creates NEW customer records** for each "New Waiver" signup, even if phone number already exists
+  - Allows same phone number to have multiple customers with different names, addresses, and minors
+  - Each customer represents a unique visit/signup with their own profile
+  - **Existing User Dashboard**: Shows ALL customer records (visits) for a given phone number with complete history
+  
+- **Waiver-Specific Minors with Junction Table**: Implemented `waiver_minors` junction table for accurate minor tracking:
+  - Minors are now linked to specific waivers (not just customer accounts)
+  - Each waiver accurately tracks which minors were included in that visit
+  - Dashboard displays correct minors for each historical waiver
+  - Prevents confusion when same customer has different minors on different visits
+  
+- **Database Optimizations**: Added comprehensive performance improvements:
+  - Performance indexes on `customers.cell_phone` and `waiver_forms.customer_id` for fast phone lookups
+  - Foreign key constraints for data integrity (`waiver_forms` → `customers`, `minors` → `customers`, `waiver_minors` → `waiver_forms`/`minors`)
+  - Cascade delete rules to maintain referential integrity
+  - Optimized batch queries for dashboard endpoint
+  
+- **New Customer Dashboard Endpoint**: `GET /api/waivers/customer-dashboard?phone=X`:
+  - Returns all customer records for a phone number
+  - Each customer includes their waivers and waiver-specific minors
+  - Efficiently batches queries to minimize database round-trips
+  - Supports unlimited history per phone number
+  
+- **Updated User Flows**:
+  - **New Waiver Flow**: Always creates separate customer → OTP verification → Signature → Rules → Completion
+  - **Existing User Flow**: Phone login → OTP verification → **Dashboard** showing all visits (no longer goes to confirm-info)
+  - Each visit in dashboard shows: date, customer name, address, minors for that specific visit, waiver status
+  
+- **Junction Table Synchronization**: Fixed critical bugs ensuring waiver_minors stays in sync:
+  - `updateCustomer` now updates waiver_minors after minor edits
+  - `saveSignature` now updates waiver_minors after signature completion
+  - All minor add/remove/toggle operations properly sync to junction table
+
+## Previous Changes (October 27, 2025)
+- **Customer History Preservation Bug Fix**: Fixed critical bug where "New Waiver" signups with existing phone numbers were overwriting customer data
+- **Signature Page Data Loading**: Fixed `getMinors` endpoint to return complete customer information
+- **Minor Management Functionality**: Implemented complete add/update/delete operations for minors
 
 ## System Architecture
 
@@ -55,7 +80,28 @@ The system comprises a React frontend and a Node.js/Express backend.
 -   **Admin Features**: Dashboard for completed waivers, waiver verification (verified/inaccurate), detailed customer profiles, staff management (add, edit, delete, roles), feedback management, and secure authentication with password management.
 
 ### System Design Choices
-The database is designed with `customers`, `waiver_forms`, `minors`, `otps`, `staff`, and `feedback` tables, allowing one customer to have multiple waiver entries. Transaction support is implemented for waiver creation to ensure data integrity. Optimized database queries and batch operations are used for performance.
+
+**Database Schema**:
+- **`customers`**: Stores customer information (name, address, phone, etc.). Multiple customers can have the same phone number.
+- **`waiver_forms`**: Stores waiver records. Each waiver links to one customer via `customer_id` foreign key.
+- **`minors`**: Stores minor information. Each minor links to one customer via `customer_id` foreign key.
+- **`waiver_minors`** (Junction Table): Links specific minors to specific waivers (many-to-many relationship). Enables tracking which minors were included in each visit.
+- **`otps`**: Stores one-time passwords for phone verification.
+- **`staff`**: Stores admin and staff accounts with role-based access.
+- **`feedback`**: Stores customer ratings and feedback.
+
+**Performance Optimizations**:
+- Indexes on `customers.cell_phone` and `waiver_forms.customer_id` for fast phone-based queries
+- Foreign key constraints with cascade delete for data integrity
+- Batch queries for dashboard endpoint to minimize database round-trips
+- Transaction support for waiver creation to ensure data consistency
+
+**Data Integrity**:
+- Foreign keys: `waiver_forms.customer_id` → `customers.id`
+- Foreign keys: `minors.customer_id` → `customers.id`
+- Foreign keys: `waiver_minors.waiver_id` → `waiver_forms.id`
+- Foreign keys: `waiver_minors.minor_id` → `minors.id`
+- Cascade delete rules maintain referential integrity when records are removed
 
 ## External Dependencies
 

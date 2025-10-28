@@ -56,63 +56,53 @@ const createWaiver = async (req, res) => {
       });
     }
 
-    let customerId;
-
-    const [existingCustomer] = await connection.query(
-      "SELECT id FROM customers WHERE cell_phone = ?",
-      [cell_phone],
+    // ALWAYS create a NEW customer record (even if phone number exists)
+    // This allows multiple customers with same phone but different names/addresses
+    const [result] = await connection.query(
+      `INSERT INTO customers 
+      (first_name, last_name, email, dob, address, city, 
+       province, postal_code, country_code, cell_phone, status) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [
+        first_name,
+        last_name,
+        email,
+        dob, 
+        address,
+        city,
+        province,
+        postal_code,
+        country_code,
+        cell_phone,
+      ],
     );
-
-    if (existingCustomer.length > 0) {
-      // Existing customer - preserve their original data
-      customerId = existingCustomer[0].id;
-      console.log(`📝 Found existing customer (ID: ${customerId}) - preserving original customer data and creating new waiver`);
-      
-      // Do NOT update customer data - preserve history
-      // Do NOT touch minors - they belong to the customer, not individual waivers
-      // Just create a new waiver_form entry below
-    } else {
-      const [result] = await connection.query(
-        `INSERT INTO customers 
-        (first_name, last_name, email, dob, address, city, 
-         province, postal_code, country_code, cell_phone, status) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        [
-          first_name,
-          last_name,
-          email,
-          dob, 
-          address,
-          city,
-          province,
-          postal_code,
-          country_code,
-          cell_phone,
-        ],
-      );
-      customerId = result.insertId;
-      
-      // Insert minors for NEW customers only
-      if (minors && minors.length > 0) {
-        const minorValues = minors.map((minor) => [
-          customerId,
-          minor.first_name,
-          minor.last_name,
-          minor.dob,
-          1,
-        ]);
-
-        await connection.query(
-          "INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?",
-          [minorValues],
-        );
-        console.log(`✅ Added ${minors.length} minor(s) for new customer ${customerId}`);
-      }
-    }
+    const customerId = result.insertId;
+    console.log(`✅ Created new customer (ID: ${customerId}) - Phone: ${cell_phone}`);
     
-    // For existing customers: Do NOT delete or modify minors
-    // Minors are linked to customer_id (not waiver_id), so they persist across all waivers
-    // If customer wants to update minors, they should use "Existing Customer" flow
+    // Insert minors for this customer and track their IDs for junction table
+    const minorIds = [];
+    if (minors && minors.length > 0) {
+      const minorValues = minors.map((minor) => [
+        customerId,
+        minor.first_name,
+        minor.last_name,
+        minor.dob,
+        1,
+      ]);
+
+      const [minorResult] = await connection.query(
+        "INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?",
+        [minorValues],
+      );
+      
+      // Store minor IDs for junction table (insertId is the first ID, subsequent IDs are +1)
+      const firstMinorId = minorResult.insertId;
+      for (let i = 0; i < minors.length; i++) {
+        minorIds.push(firstMinorId + i);
+      }
+      
+      console.log(`✅ Added ${minors.length} minor(s) for customer ${customerId}`);
+    }
 
     // Create waiver form entry
     const [waiverResult] = await connection.query(
@@ -121,10 +111,20 @@ const createWaiver = async (req, res) => {
     );
 
     const waiverId = waiverResult.insertId;
+    console.log(`✅ Created waiver (ID: ${waiverId}) for customer ${customerId}`);
+    
+    // Link minors to this specific waiver in junction table
+    if (minorIds.length > 0) {
+      const waiverMinorValues = minorIds.map(minorId => [waiverId, minorId]);
+      await connection.query(
+        "INSERT INTO waiver_minors (waiver_id, minor_id) VALUES ?",
+        [waiverMinorValues],
+      );
+      console.log(`✅ Linked ${minorIds.length} minor(s) to waiver ${waiverId} in junction table`);
+    }
 
-    // SEND OTP TO NEW CUSTOMERS via SMS
-    // Only send OTP if this is a NEW customer and send_otp is true
-    if (send_otp && existingCustomer.length === 0) {
+    // SEND OTP via SMS for all new customer signups
+    if (send_otp) {
       try {
         // Generate 4-digit OTP
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
@@ -355,6 +355,41 @@ const updateCustomer = async (req, res) => {
       }
     }
 
+    // Update waiver_minors junction table to reflect current minors
+    // Get the most recent waiver for this customer
+    const [recentWaivers] = await db.query(
+      "SELECT id FROM waiver_forms WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1",
+      [id]
+    );
+
+    if (recentWaivers.length > 0) {
+      const waiverId = recentWaivers[0].id;
+      
+      // Delete old waiver_minors entries
+      await db.query(
+        "DELETE FROM waiver_minors WHERE waiver_id = ?",
+        [waiverId]
+      );
+      
+      // Get all active minors for this customer
+      const [activeMinors] = await db.query(
+        "SELECT id FROM minors WHERE customer_id = ? AND status = 1",
+        [id]
+      );
+      
+      // Insert new waiver_minors entries
+      if (activeMinors.length > 0) {
+        const waiverMinorValues = activeMinors.map(minor => [waiverId, minor.id]);
+        await db.query(
+          "INSERT INTO waiver_minors (waiver_id, minor_id) VALUES ?",
+          [waiverMinorValues]
+        );
+        console.log(`✅ Updated waiver_minors junction table: ${activeMinors.length} minor(s) linked to waiver ${waiverId}`);
+      } else {
+        console.log(`✅ Cleared waiver_minors junction table for waiver ${waiverId} (no active minors)`);
+      }
+    }
+
     res.json({
       success: true,
       message: "Customer updated successfully",
@@ -467,6 +502,31 @@ const saveSignature = async (req, res) => {
         [id, signature],
       );
       waiverId = result.insertId;
+    }
+
+    // Update waiver_minors junction table to reflect current minors
+    // Delete old waiver_minors entries
+    await db.query(
+      "DELETE FROM waiver_minors WHERE waiver_id = ?",
+      [waiverId]
+    );
+
+    // Get all active minors for this customer
+    const [activeMinors] = await db.query(
+      "SELECT id FROM minors WHERE customer_id = ? AND status = 1",
+      [id]
+    );
+
+    // Insert new waiver_minors entries
+    if (activeMinors.length > 0) {
+      const waiverMinorValues = activeMinors.map(minor => [waiverId, minor.id]);
+      await db.query(
+        "INSERT INTO waiver_minors (waiver_id, minor_id) VALUES ?",
+        [waiverMinorValues]
+      );
+      console.log(`✅ Updated waiver_minors junction table: ${activeMinors.length} minor(s) linked to waiver ${waiverId}`);
+    } else {
+      console.log(`✅ Cleared waiver_minors junction table for waiver ${waiverId} (no active minors)`);
     }
 
     res.json({
@@ -788,10 +848,13 @@ const getWaiverDetails = async (req, res) => {
     const waiver = waivers[0];
     const customerId = waiver.customer_id;
 
-    // Get minors for this customer
+    // Get minors for this SPECIFIC waiver (via junction table)
     const [minors] = await db.query(
-      "SELECT * FROM minors WHERE customer_id = ?",
-      [customerId],
+      `SELECT m.* 
+       FROM minors m
+       INNER JOIN waiver_minors wm ON m.id = wm.minor_id
+       WHERE wm.waiver_id = ?`,
+      [id],
     );
 
     // Get waiver history for this customer with customer name and staff who verified
@@ -1126,6 +1189,148 @@ const saveRating = async (req, res) => {
   }
 };
 
+/**
+ * Gets dashboard data for existing customer showing all their visits
+ * Returns all customer records with the given phone number
+ * Each customer record includes their waivers and waiver-specific minors
+ */
+const getCustomerDashboard = async (req, res) => {
+  try {
+    const { phone } = req.query;
+
+    // Validate phone parameter
+    if (!phone) {
+      return res.status(400).json({
+        error: "Phone number is required",
+      });
+    }
+
+    // Get all customer records with this phone number
+    const [customers] = await db.query(
+      `SELECT 
+        c.id,
+        c.first_name,
+        c.last_name,
+        c.email,
+        c.dob,
+        c.address,
+        c.city,
+        c.province,
+        c.postal_code,
+        c.country_code,
+        c.cell_phone,
+        c.created_at
+      FROM customers c
+      WHERE c.cell_phone = ?
+      ORDER BY c.created_at DESC`,
+      [phone],
+    );
+
+    if (customers.length === 0) {
+      return res.json({ 
+        message: "No customer records found for this phone number",
+        customers: [] 
+      });
+    }
+
+    // Get customer IDs for batch queries
+    const customerIds = customers.map(c => c.id);
+
+    // Fetch all waivers for these customers
+    const [waivers] = await db.query(
+      `SELECT 
+        wf.id as waiver_id,
+        wf.customer_id,
+        wf.signed_at,
+        wf.signature_image,
+        wf.rules_accepted,
+        wf.completed,
+        wf.verified_by_staff,
+        wf.created_at,
+        CASE 
+          WHEN wf.verified_by_staff > 0 THEN s.name
+          ELSE NULL
+        END as verified_by_name
+      FROM waiver_forms wf
+      LEFT JOIN staff s ON wf.verified_by_staff = s.id
+      WHERE wf.customer_id IN (?)
+      ORDER BY wf.created_at DESC`,
+      [customerIds],
+    );
+
+    // Get waiver IDs for batch query
+    const waiverIds = waivers.map(w => w.waiver_id);
+
+    // Fetch all minors for these waivers via junction table
+    let minorsByWaiverId = {};
+    if (waiverIds.length > 0) {
+      const [minorRecords] = await db.query(
+        `SELECT 
+          wm.waiver_id,
+          m.id,
+          m.first_name,
+          m.last_name,
+          m.dob,
+          m.status
+        FROM waiver_minors wm
+        INNER JOIN minors m ON wm.minor_id = m.id
+        WHERE wm.waiver_id IN (?)`,
+        [waiverIds],
+      );
+
+      // Group minors by waiver_id
+      minorRecords.forEach(minor => {
+        if (!minorsByWaiverId[minor.waiver_id]) {
+          minorsByWaiverId[minor.waiver_id] = [];
+        }
+        minorsByWaiverId[minor.waiver_id].push({
+          id: minor.id,
+          first_name: minor.first_name,
+          last_name: minor.last_name,
+          dob: minor.dob,
+          status: minor.status
+        });
+      });
+    }
+
+    // Group waivers by customer_id and attach minors
+    const waiversByCustomerId = {};
+    waivers.forEach(waiver => {
+      if (!waiversByCustomerId[waiver.customer_id]) {
+        waiversByCustomerId[waiver.customer_id] = [];
+      }
+      waiversByCustomerId[waiver.customer_id].push({
+        ...waiver,
+        minors: minorsByWaiverId[waiver.waiver_id] || []
+      });
+    });
+
+    // Combine customers with their waivers
+    const customerVisits = customers.map(customer => ({
+      ...customer,
+      waivers: waiversByCustomerId[customer.id] || []
+    }));
+
+    res.json({
+      success: true,
+      phone: phone,
+      totalCustomers: customers.length,
+      customers: customerVisits,
+    });
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching customer dashboard:`, {
+      message: error.message,
+      phone: req.query.phone,
+    });
+
+    res.status(500).json({
+      error: "Failed to fetch customer dashboard",
+      errorId,
+    });
+  }
+};
+
 module.exports = {
   createWaiver,
   getCustomerInfo,
@@ -1142,4 +1347,5 @@ module.exports = {
   updateWaiverStatus,
   getRatingInfo,
   saveRating,
+  getCustomerDashboard,
 };
