@@ -104,21 +104,11 @@ CREATE TABLE minors (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- TABLE: waiver_minors (Junction Table)
--- Links specific minors to specific waivers
+-- NOTE: waiver_minors junction table removed
+-- We use minors_snapshot JSON column in waivers table instead
+-- This provides historical accuracy - each waiver stores the exact
+-- minor data as it was at signing time
 -- ============================================================
-CREATE TABLE waiver_minors (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  waiver_id INT NOT NULL,
-  minor_id INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
-  FOREIGN KEY (waiver_id) REFERENCES waivers(id) ON DELETE CASCADE,
-  FOREIGN KEY (minor_id) REFERENCES minors(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_waiver_minor (waiver_id, minor_id),
-  INDEX idx_waiver_id (waiver_id),
-  INDEX idx_minor_id (minor_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- TABLE: otps

@@ -12,6 +12,18 @@ function UpdateStaff() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Check if user is superadmin
+  React.useEffect(() => {
+    const staffData = localStorage.getItem('staff');
+    if (staffData) {
+      const user = JSON.parse(staffData);
+      if (user.role !== 'superadmin') {
+        toast.error('Access denied. Only superadmin can edit staff.');
+        navigate('/admin/staff-list');
+      }
+    }
+  }, [navigate]);
+
   // Fetch Staff Details
   const fetchStaff = useCallback(async () => {
     setLoading(true);
@@ -122,13 +134,13 @@ function UpdateStaff() {
                   <label className="form-label">Role</label>
                   <select
                     name="role"
-                    value={form.role}
+                    value={form.role || ""}
                     onChange={handleChange}
                     className="form-control"
                   >
                     <option value="">Select Role</option>
-                    <option value="1">Admin</option>
-                    <option value="2">Staff</option>
+                    <option value="admin">Admin</option>
+                    <option value="staff">Staff</option>
                   </select>
                 </div>
 

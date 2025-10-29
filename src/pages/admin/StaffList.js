@@ -19,8 +19,17 @@ const StaffList = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const navigate = useNavigate();
+
+  // Get current user info from localStorage
+  useEffect(() => {
+    const staffData = localStorage.getItem('staff');
+    if (staffData) {
+      setCurrentUser(JSON.parse(staffData));
+    }
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -127,20 +136,24 @@ const StaffList = () => {
     {
       name: "Status",
       cell: row => (
-        <Switch
-          onChange={() => openModal(row.id, row.name, "status")}
-          checked={row.status === 1}
-          onColor="#4CAF50"
-          offColor="#ccc"
-          handleDiameter={20}
-          uncheckedIcon={false}
-          checkedIcon={false}
-          height={20}
-          width={40}
-        />
+        currentUser?.role === 'superadmin' ? (
+          <Switch
+            onChange={() => openModal(row.id, row.name, "status")}
+            checked={row.status === 1}
+            onColor="#4CAF50"
+            offColor="#ccc"
+            handleDiameter={20}
+            uncheckedIcon={false}
+            checkedIcon={false}
+            height={20}
+            width={40}
+          />
+        ) : (
+          <span>{row.status === 1 ? 'Active' : 'Inactive'}</span>
+        )
       )
     },
-    {
+    ...(currentUser?.role === 'superadmin' ? [{
       name: "Action",
       cell: row => (
         <div className="d-flex gap-3">
@@ -156,7 +169,7 @@ const StaffList = () => {
           />
         </div>
       )
-    }
+    }] : [])
   ];
 
   const mobileColumns = [
@@ -179,33 +192,39 @@ const StaffList = () => {
       </div>
       <div style={{ marginTop: "10px" }}>
         <strong>Status:</strong>{" "}
-        <Switch
-          onChange={() => openModal(data.id, data.name, "status")}
-          checked={data.status === 1}
-          onColor="#4CAF50"
-          offColor="#ccc"
-          handleDiameter={20}
-          uncheckedIcon={false}
-          checkedIcon={false}
-          height={20}
-          width={40}
-        />
+        {currentUser?.role === 'superadmin' ? (
+          <Switch
+            onChange={() => openModal(data.id, data.name, "status")}
+            checked={data.status === 1}
+            onColor="#4CAF50"
+            offColor="#ccc"
+            handleDiameter={20}
+            uncheckedIcon={false}
+            checkedIcon={false}
+            height={20}
+            width={40}
+          />
+        ) : (
+          <span>{data.status === 1 ? 'Active' : 'Inactive'}</span>
+        )}
       </div>
-      <div style={{ marginTop: "10px" }}>
-        <strong>Action:</strong>{" "}
-        <div className="d-flex gap-3">
-          <i
-            className="fas fa-edit"
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate(`/admin/update-staff/${data.id}`)}
-          />
-          <i
-            className="fas fa-trash"
-            style={{ cursor: "pointer", color: "red" }}
-            onClick={() => openModal(data.id, data.name, "delete")}
-          />
+      {currentUser?.role === 'superadmin' && (
+        <div style={{ marginTop: "10px" }}>
+          <strong>Action:</strong>{" "}
+          <div className="d-flex gap-3">
+            <i
+              className="fas fa-edit"
+              style={{ cursor: "pointer" }}
+              onClick={() => navigate(`/admin/update-staff/${data.id}`)}
+            />
+            <i
+              className="fas fa-trash"
+              style={{ cursor: "pointer", color: "red" }}
+              onClick={() => openModal(data.id, data.name, "delete")}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 
@@ -218,12 +237,14 @@ const StaffList = () => {
 
             <div className="d-flex flex-wrap justify-content-between mb-4">
               <h2>Staff List</h2>
-              <button
-                onClick={() => navigate("/admin/add-staff")}
-                className="btn btn-primary"
-              >
-                + Add Staff
-              </button>
+              {currentUser?.role === 'superadmin' && (
+                <button
+                  onClick={() => navigate("/admin/add-staff")}
+                  className="btn btn-primary"
+                >
+                  + Add Staff
+                </button>
+              )}
             </div>
 
             <div className="d-flex flex-wrap justify-content-between mb-4">

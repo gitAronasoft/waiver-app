@@ -385,7 +385,7 @@ const updateCustomer = async (req, res) => {
     }
 
     await db.query(
-      `UPDATE customers SET 
+      `UPDATE users SET 
         first_name = ?, last_name = ?, email = ?, dob = ?, 
         address = ?, city = ?, province = ?, postal_code = ?, 
         cell_phone = ?, updated_at = NOW()
@@ -979,6 +979,7 @@ const getWaiverDetails = async (req, res) => {
         wf.verified_by_staff,
         wf.rules_accepted,
         wf.signer_name as name,
+        wf.minors_snapshot,
         CASE 
           WHEN wf.verified_by_staff > 0 THEN CONCAT('Marked by ', s.name)
           ELSE 'Not verified'
@@ -997,6 +998,14 @@ const getWaiverDetails = async (req, res) => {
       date: w.signed_at ? convertToEST(w.signed_at, "MMM DD, YYYY [at] hh:mm A") : null
     }));
 
+    // Fetch phone number from users table (not stored in snapshot)
+    const [userData] = await db.query(
+      `SELECT cell_phone, country_code FROM users WHERE id = ?`,
+      [customerId]
+    );
+
+    const userPhone = userData.length > 0 ? userData[0] : {};
+
     // Build customer object from snapshot data to match expected frontend format
     const customerData = {
       id: customerId,
@@ -1009,6 +1018,8 @@ const getWaiverDetails = async (req, res) => {
       city: waiver.signer_city,
       province: waiver.signer_province,
       postal_code: waiver.signer_postal,
+      cell_phone: userPhone.cell_phone || null,
+      country_code: userPhone.country_code || null,
       signed_at: waiver.signed_at,
       signature_image: waiver.signature_image,
       rules_accepted: waiver.rules_accepted,
@@ -1344,9 +1355,8 @@ const saveRating = async (req, res) => {
 };
 
 /**
- * Gets dashboard data for existing customer showing all their visits
- * Returns all customer records with the given phone number
- * Each customer record includes their waivers and waiver-specific minors
+ * Gets dashboard data for existing customer showing all their visits (waivers)
+ * Returns waivers for the phone number, with customer and minor data from snapshots
  */
 const getCustomerDashboard = async (req, res) => {
   try {
@@ -1359,130 +1369,109 @@ const getCustomerDashboard = async (req, res) => {
       });
     }
 
-    // Get all customer records with this phone number
-    const [customers] = await db.query(
-      `SELECT 
-        c.id,
-        c.first_name,
-        c.last_name,
-        c.email,
-        c.dob,
-        c.address,
-        c.city,
-        c.province,
-        c.postal_code,
-        c.country_code,
-        c.cell_phone,
-        c.status,
-        c.created_at
-      FROM users c
-      WHERE c.cell_phone = ?
-      ORDER BY c.created_at DESC`,
+    // Get all users with this phone number to find their waivers
+    const [users] = await db.query(
+      `SELECT id, status FROM users WHERE cell_phone = ?`,
       [phone],
     );
 
-    if (customers.length === 0) {
+    if (users.length === 0) {
       return res.json({ 
         message: "No customer records found for this phone number",
-        customers: [] 
+        waivers: [],
+        isVerified: false
       });
     }
 
-    // Check if user has any verified customer records (status = 1)
-    const hasVerifiedCustomer = customers.some(c => c.status === 1);
-    
-    // If user hasn't verified any customer via OTP, show only the most recent waiver
-    let filteredCustomers = customers;
-    if (!hasVerifiedCustomer) {
-      filteredCustomers = [customers[0]]; // Only show the latest customer record
-      console.log(`⚠️ User has not verified OTP - showing only latest waiver for phone: ${phone}`);
-    } else {
-      console.log(`✅ User has verified OTP - showing all ${customers.length} waivers for phone: ${phone}`);
-    }
+    // Check if any user with this phone has verified via OTP
+    const hasVerifiedUser = users.some(u => u.status === 1);
+    const userIds = users.map(u => u.id);
 
-    // Get customer IDs for batch queries (use filtered customers)
-    const customerIds = filteredCustomers.map(c => c.id);
-
-    // Fetch all waivers for these customers
+    // Fetch all waivers for these users with snapshot data
     const [waivers] = await db.query(
       `SELECT 
-        wf.id as waiver_id,
-        wf.user_id,
-        wf.signed_at,
-        wf.signature_image,
-        wf.rules_accepted,
-        wf.completed,
-        wf.verified_by_staff,
-        wf.created_at,
+        w.id as waiver_id,
+        w.user_id,
+        w.signed_at,
+        w.signature_image,
+        w.rules_accepted,
+        w.completed,
+        w.verified_by_staff,
+        w.created_at,
+        w.signer_name,
+        w.signer_email,
+        w.signer_dob,
+        w.signer_address,
+        w.signer_city,
+        w.signer_province,
+        w.signer_postal,
+        w.minors_snapshot,
         CASE 
-          WHEN wf.verified_by_staff > 0 THEN s.name
+          WHEN w.verified_by_staff > 0 THEN s.name
           ELSE NULL
         END as verified_by_name
-      FROM waivers wf
-      LEFT JOIN staff s ON wf.verified_by_staff = s.id
-      WHERE wf.user_id IN (?)
-      ORDER BY wf.created_at DESC`,
-      [customerIds],
+      FROM waivers w
+      LEFT JOIN staff s ON w.verified_by_staff = s.id
+      WHERE w.user_id IN (?) AND w.completed = 1
+      ORDER BY w.created_at DESC`,
+      [userIds],
     );
 
-    // Get waiver IDs for batch query
-    const waiverIds = waivers.map(w => w.waiver_id);
-
-    // Fetch all minors for these customers
-    let minorsByCustomerId = {};
-    if (customerIds.length > 0) {
-      const [minorRecords] = await db.query(
-        `SELECT 
-          m.user_id,
-          m.id,
-          m.first_name,
-          m.last_name,
-          m.dob,
-          m.status
-        FROM minors m
-        WHERE m.user_id IN (?) AND m.status = 1`,
-        [customerIds],
-      );
-
-      // Group minors by user_id
-      minorRecords.forEach(minor => {
-        if (!minorsByCustomerId[minor.user_id]) {
-          minorsByCustomerId[minor.user_id] = [];
-        }
-        minorsByCustomerId[minor.user_id].push({
-          id: minor.id,
-          first_name: minor.first_name,
-          last_name: minor.last_name,
-          dob: minor.dob,
-          status: minor.status
-        });
-      });
+    // If user hasn't verified OTP, show only the most recent waiver
+    let filteredWaivers = waivers;
+    if (!hasVerifiedUser && waivers.length > 0) {
+      filteredWaivers = [waivers[0]];
+      console.log(`⚠️ User has not verified OTP - showing only latest waiver for phone: ${phone}`);
+    } else {
+      console.log(`✅ User has verified OTP - showing all ${waivers.length} waivers for phone: ${phone}`);
     }
 
-    // Group waivers by user_id and attach minors
-    const waiversByCustomerId = {};
-    waivers.forEach(waiver => {
-      if (!waiversByCustomerId[waiver.user_id]) {
-        waiversByCustomerId[waiver.user_id] = [];
+    // Parse each waiver's snapshot data
+    const waiversWithData = filteredWaivers.map(waiver => {
+      // Parse minors from snapshot
+      let minors = [];
+      if (waiver.minors_snapshot) {
+        try {
+          minors = JSON.parse(waiver.minors_snapshot);
+        } catch (parseError) {
+          console.error(`Error parsing minors_snapshot for waiver ${waiver.waiver_id}:`, parseError);
+        }
       }
-      waiversByCustomerId[waiver.user_id].push({
-        ...waiver,
-        minors: minorsByCustomerId[waiver.user_id] || []
-      });
-    });
 
-    // Combine customers with their waivers (use filtered customers)
-    const customerVisits = filteredCustomers.map(customer => ({
-      ...customer,
-      waivers: waiversByCustomerId[customer.id] || []
-    }));
+      // Extract first_name and last_name from signer_name
+      const nameParts = waiver.signer_name ? waiver.signer_name.split(' ') : ['', ''];
+      const first_name = nameParts[0] || '';
+      const last_name = nameParts.slice(1).join(' ') || '';
+
+      return {
+        waiver_id: waiver.waiver_id,
+        user_id: waiver.user_id,
+        first_name,
+        last_name,
+        email: waiver.signer_email,
+        dob: waiver.signer_dob,
+        address: waiver.signer_address,
+        city: waiver.signer_city,
+        province: waiver.signer_province,
+        postal_code: waiver.signer_postal,
+        cell_phone: phone,
+        signed_at: waiver.signed_at,
+        signature_image: waiver.signature_image,
+        rules_accepted: waiver.rules_accepted,
+        completed: waiver.completed,
+        verified_by_staff: waiver.verified_by_staff,
+        verified_by_name: waiver.verified_by_name,
+        created_at: waiver.created_at,
+        minors: minors
+      };
+    });
 
     res.json({
       success: true,
       phone: phone,
-      totalCustomers: filteredCustomers.length,
-      customers: customerVisits,
-      isVerified: hasVerifiedCustomer
+      totalWaivers: filteredWaivers.length,
+      waivers: waiversWithData,
+      isVerified: hasVerifiedUser
     });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;

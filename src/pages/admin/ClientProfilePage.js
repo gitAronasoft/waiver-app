@@ -110,8 +110,29 @@ function ProfilePage() {
 //   }
 // };
 
-const handleDownloadPDF = async () => {
+const handleDownloadPDF = async (waiverId) => {
   try {
+    // Fetch the specific waiver's snapshot data
+    const response = await axios.get(`${BACKEND_URL}/api/waivers/waiver-details/${waiverId}`);
+    const waiverData = response.data;
+    
+    // Store original state
+    const originalCustomer = customer;
+    const originalMinors = minors;
+    const originalWaiverHistory = waiverHistory;
+    
+    // Create a temporary waiver history with only the selected waiver's data
+    const selectedWaiver = waiverHistory.find(w => w.id === waiverId);
+    const tempWaiverHistory = selectedWaiver ? [selectedWaiver] : [];
+    
+    // Update state with waiver-specific snapshot data
+    setCustomer(waiverData.customer);
+    setMinors(waiverData.minors || []);
+    setWaiverHistory(tempWaiverHistory);
+    
+    // Wait for React to re-render with new data
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     const input = pdfRef.current;
 
     // Lower scale to reduce resolution (and file size)
@@ -169,7 +190,12 @@ const handleDownloadPDF = async () => {
       pageIndex++;
     }
 
-    pdf.save(`waiver-${id}.pdf`);
+    pdf.save(`waiver-${waiverId}.pdf`);
+    
+    // Restore original data after PDF generation
+    setCustomer(originalCustomer);
+    setMinors(originalMinors);
+    setWaiverHistory(originalWaiverHistory);
   } catch (err) {
     console.error("PDF generation failed", err);
   }
@@ -470,7 +496,7 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                 </div>
                 <div className="w-100 mb-3">
                   <label className="form-label">Cell Phone</label>
-                  <input type="text" className="form-control" value={`${customer.country_code} ${formatPhone(customer.cell_phone)}`} readOnly />
+                  <input type="text" className="form-control" value={customer.cell_phone ? `${customer.country_code || ''} ${formatPhone(customer.cell_phone)}` : 'Not available'} readOnly />
                 </div>
               </div>
 
@@ -511,7 +537,7 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                         </div>
                       </div>
                       <div className="w-100 text-end">
-                        <button className="hide-btn" onClick={handleDownloadPDF}>Download PDF</button>
+                        <button className="hide-btn" onClick={() => handleDownloadPDF(entry.id)}>Download PDF</button>
                       </div>
                     </div>
                   ))}

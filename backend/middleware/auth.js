@@ -17,4 +17,18 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-module.exports = { authenticateToken };
+const requireSuperAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  if (req.user.role !== 'superadmin') {
+    return res.status(403).json({ 
+      message: 'Access denied. Only superadmin can perform this action.' 
+    });
+  }
+
+  next();
+};
+
+module.exports = { authenticateToken, requireSuperAdmin };

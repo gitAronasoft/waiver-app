@@ -186,7 +186,13 @@ function HistoryPage() {
 //     }
 //   ];
 const desktopColumns = [
-  { name: "#", cell: (row, index) => index + 1, width: "60px", sortable: true },
+  { 
+    name: "Waiver ID", 
+    selector: row => row.waiver_id,
+    cell: (row) => <strong>#{row.waiver_id}</strong>, 
+    width: "100px", 
+    sortable: true 
+  },
 
   {
     name: "Name",
@@ -286,13 +292,14 @@ const desktopColumns = [
 
   // Mobile columns
   const mobileColumns = [
-    { name: "Name", selector: row => `${row.first_name} ${row.last_name}`, sortable: true },
     { 
-      name: "Signed Date", 
-      selector: row => row.signed_at, 
-      cell: row => <span>{row.signed_at || '-'}</span>,
-      sortable: true 
-    }
+      name: "Waiver ID", 
+      selector: row => row.waiver_id,
+      cell: (row) => <strong>#{row.waiver_id}</strong>,
+      sortable: true,
+      width: "100px"
+    },
+    { name: "Name", selector: row => `${row.first_name} ${row.last_name}`, sortable: true }
   ];
 
   // Expandable component for mobile

@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const staffController = require('../controllers/staffController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireSuperAdmin } = require('../middleware/auth');
 
 // Configure multer for profile image uploads
 const storage = multer.diskStorage({
@@ -44,10 +44,10 @@ router.use(authenticateToken);
 router.post('/change-password', staffController.changePassword);
 router.get('/getstaff', staffController.getAllStaff);
 router.get('/:id', staffController.getStaffById);
-router.post('/addstaff', staffController.addStaff);
-router.put('/update-staff/:id', staffController.updateStaff);
+router.post('/addstaff', requireSuperAdmin, staffController.addStaff);
+router.put('/update-staff/:id', requireSuperAdmin, staffController.updateStaff);
 router.post('/update-profile', upload.single('profileImage'), staffController.updateProfile);
-router.put('/update-status/:id', staffController.updateStatus);
-router.delete('/delete-staff/:id', staffController.deleteStaff);
+router.put('/update-status/:id', requireSuperAdmin, staffController.updateStatus);
+router.delete('/delete-staff/:id', requireSuperAdmin, staffController.deleteStaff);
 
 module.exports = router;

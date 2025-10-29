@@ -10,6 +10,18 @@ function AddStaff() {
   const [form, setForm] = useState({ name: "", email: "", role: "" });
   const [loading, setLoading] = useState(false);
 
+  // Check if user is superadmin
+  React.useEffect(() => {
+    const staffData = localStorage.getItem('staff');
+    if (staffData) {
+      const user = JSON.parse(staffData);
+      if (user.role !== 'superadmin') {
+        toast.error('Access denied. Only superadmin can add staff.');
+        navigate('/admin/staff-list');
+      }
+    }
+  }, [navigate]);
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
@@ -111,8 +123,8 @@ function AddStaff() {
                     disabled={loading}
                   >
                     <option value="">Select Role</option>
-                    <option value="1">Admin</option>
-                    <option value="2">Staff</option>
+                    <option value="admin">Admin</option>
+                    <option value="staff">Staff</option>
                   </select>
                   <small className="text-muted">A secure password setup link will be sent to the staff member's email</small>
                 </div>

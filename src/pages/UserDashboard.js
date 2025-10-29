@@ -10,7 +10,7 @@ function UserDashboard() {
   const location = useLocation();
   const navigate = useNavigate();
   const phone = location.state?.phone;
-  const [customerVisits, setCustomerVisits] = useState([]);
+  const [waivers, setWaivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isVerified, setIsVerified] = useState(true);
 
@@ -31,7 +31,7 @@ function UserDashboard() {
       const response = await axios.get(
         `${BACKEND_URL}/api/waivers/customer-dashboard?phone=${phone}`
       );
-      setCustomerVisits(response.data.customers || []);
+      setWaivers(response.data.waivers || []);
       setIsVerified(response.data.isVerified || false);
     } catch (error) {
       console.error("Error fetching customer dashboard:", error);
@@ -122,15 +122,15 @@ function UserDashboard() {
             <p className="text-muted mb-1" style={{ fontSize: '0.95rem' }}>
               Phone: <strong>{formatPhone(phone)}</strong>
             </p>
-            {!isVerified && customerVisits.length > 0 && (
+            {!isVerified && waivers.length > 0 && (
               <div className="alert alert-warning mx-auto" style={{ maxWidth: '600px', fontSize: '0.9rem' }}>
                 <i className="fas fa-info-circle me-2"></i>
                 <strong>Note:</strong> Please verify your phone number to view your complete visit history.
               </div>
             )}
-            {customerVisits.length > 0 && (
+            {waivers.length > 0 && (
               <p className="mb-0" style={{ fontSize: '0.95rem', color: '#6C5CE7' }}>
-                <strong>{customerVisits.length}</strong> visit{customerVisits.length !== 1 ? 's' : ''} {isVerified ? 'found' : 'pending verification'}
+                <strong>{waivers.length}</strong> visit{waivers.length !== 1 ? 's' : ''} {isVerified ? 'found' : 'pending verification'}
               </p>
             )}
           </div>
@@ -148,7 +148,7 @@ function UserDashboard() {
                   </div>
                 </div>
               </div>
-            ) : customerVisits.length === 0 ? (
+            ) : waivers.length === 0 ? (
               <div className="text-center mt-4 py-4">
                 <img
                   src="/assets/img/image 303.png"
@@ -171,7 +171,7 @@ function UserDashboard() {
                     <table className="table table-hover mb-0" style={{ fontSize: '0.9rem' }}>
                       <thead style={{ background: 'linear-gradient(135deg, #6C5CE7 0%, #8B7FE8 100%)', borderBottom: '3px solid #6C5CE7' }}>
                         <tr>
-                          <th className="py-3 px-3" style={{ fontWeight: '600', width: '15%' }}>Visit #</th>
+                          <th className="py-3 px-3" style={{ fontWeight: '600', width: '15%' }}>Waiver ID</th>
                           <th className="py-3 px-3" style={{ fontWeight: '600', width: '25%' }}>Name</th>
                           <th className="py-3 px-3" style={{ fontWeight: '600', width: '30%' }}>Date & Time</th>
                           <th className="py-3 px-3" style={{ fontWeight: '600', width: '15%' }}>Minors</th>
@@ -179,18 +179,14 @@ function UserDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {customerVisits.map((customer, index) => {
-                          const latestWaiver = customer.waivers && customer.waivers.length > 0 
-                            ? customer.waivers[0] 
-                            : null;
-                          
+                        {waivers.map((waiver, index) => {
                           return (
                             <tr 
-                              key={customer.id} 
+                              key={waiver.waiver_id} 
                               onClick={() => navigate("/confirm-info", { 
                                 state: { 
                                   phone, 
-                                  customerId: customer.id,
+                                  customerId: waiver.user_id,
                                   isReturning: true
                                 } 
                               })}
@@ -198,17 +194,17 @@ function UserDashboard() {
                               className="waiver-row"
                             >
                               <td className="py-3 px-3 align-middle">
-                                <strong style={{ color: '#6C5CE7' }}>#{customerVisits.length - index}</strong>
+                                <strong style={{ color: '#6C5CE7' }}>#{waiver.waiver_id}</strong>
                               </td>
                               <td className="py-3 px-3 align-middle">
                                 <div>
                                   <div style={{ fontWeight: '500', color: '#212529' }}>
-                                    {customer.first_name} {customer.last_name}
+                                    {waiver.first_name} {waiver.last_name}
                                   </div>
-                                  {customer.email && (
+                                  {waiver.email && (
                                     <div style={{ fontSize: '0.8rem', color: '#6c757d' }}>
                                       <i className="fas fa-envelope me-1"></i>
-                                      {customer.email}
+                                      {waiver.email}
                                     </div>
                                   )}
                                 </div>
@@ -216,21 +212,21 @@ function UserDashboard() {
                               <td className="py-3 px-3 align-middle">
                                 <div style={{ color: '#495057' }}>
                                   <i className="fas fa-calendar-alt me-2" style={{ color: '#6C5CE7' }}></i>
-                                  {formatDate(customer.created_at)}
+                                  {formatDate(waiver.signed_at || waiver.created_at)}
                                 </div>
                               </td>
                               <td className="py-3 px-3 align-middle">
-                                {latestWaiver && latestWaiver.minors && latestWaiver.minors.length > 0 ? (
+                                {waiver.minors && waiver.minors.length > 0 ? (
                                   <span className="badge" style={{ backgroundColor: '#FFD93D', color: '#000', fontWeight: '600' }}>
                                     <i className="fas fa-child me-1"></i>
-                                    {latestWaiver.minors.length}
+                                    {waiver.minors.length}
                                   </span>
                                 ) : (
                                   <span className="text-muted">None</span>
                                 )}
                               </td>
                               <td className="py-3 px-3 text-center align-middle">
-                                {latestWaiver && getStatusBadge(latestWaiver.verified_by_staff)}
+                                {getStatusBadge(waiver.verified_by_staff)}
                               </td>
                             </tr>
                           );
