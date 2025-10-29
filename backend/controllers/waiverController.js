@@ -1205,6 +1205,7 @@ const getCustomerDashboard = async (req, res) => {
         c.postal_code,
         c.country_code,
         c.cell_phone,
+        c.status,
         c.created_at
       FROM customers c
       WHERE c.cell_phone = ?
@@ -1219,8 +1220,20 @@ const getCustomerDashboard = async (req, res) => {
       });
     }
 
-    // Get customer IDs for batch queries
-    const customerIds = customers.map(c => c.id);
+    // Check if user has any verified customer records (status = 1)
+    const hasVerifiedCustomer = customers.some(c => c.status === 1);
+    
+    // If user hasn't verified any customer via OTP, show only the most recent waiver
+    let filteredCustomers = customers;
+    if (!hasVerifiedCustomer) {
+      filteredCustomers = [customers[0]]; // Only show the latest customer record
+      console.log(`⚠️ User has not verified OTP - showing only latest waiver for phone: ${phone}`);
+    } else {
+      console.log(`✅ User has verified OTP - showing all ${customers.length} waivers for phone: ${phone}`);
+    }
+
+    // Get customer IDs for batch queries (use filtered customers)
+    const customerIds = filteredCustomers.map(c => c.id);
 
     // Fetch all waivers for these customers
     const [waivers] = await db.query(
@@ -1290,8 +1303,8 @@ const getCustomerDashboard = async (req, res) => {
       });
     });
 
-    // Combine customers with their waivers
-    const customerVisits = customers.map(customer => ({
+    // Combine customers with their waivers (use filtered customers)
+    const customerVisits = filteredCustomers.map(customer => ({
       ...customer,
       waivers: waiversByCustomerId[customer.id] || []
     }));
@@ -1299,8 +1312,9 @@ const getCustomerDashboard = async (req, res) => {
     res.json({
       success: true,
       phone: phone,
-      totalCustomers: customers.length,
+      totalCustomers: filteredCustomers.length,
       customers: customerVisits,
+      isVerified: hasVerifiedCustomer
     });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;

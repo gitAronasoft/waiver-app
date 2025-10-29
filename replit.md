@@ -8,6 +8,30 @@ I prefer simple language in explanations. I want iterative development, with fre
 
 ## Recent Changes
 
+### October 29, 2025 - OTP Verification Restriction for Dashboard Access
+- **Unverified User Restrictions**: Implemented phone verification requirement for complete waiver history access:
+  - Added `status` field tracking to `customers` table (0 = unverified, 1 = verified)
+  - `verifyOtp` now sets customer status to 1 after successful OTP verification
+  - `getCustomerDashboard` filters results based on verification status:
+    - **Unverified users** (status = 0): Only see their most recent waiver
+    - **Verified users** (status = 1): See complete waiver history
+  - Added warning message on UserDashboard for unverified users
+  - Backend logs verification status for debugging and monitoring
+  
+- **Security Enhancement**: Prevents unauthorized access to historical waiver data without phone verification
+- **User Flow Impact**:
+  - Users who skip OTP verification can only view current waiver
+  - After OTP verification, complete visit history becomes accessible
+  - Encourages OTP verification to unlock full dashboard features
+
+### October 29, 2025 - Logo Standardization
+- **Logo Path Cleanup**: Standardized logo references across all 18 files:
+  - Changed from: `assets/img/SKATE_AND_PLAY_V08_Full_Transparency (2) 1.png`
+  - Changed to: `assets/img/logo.png`
+  - Updated customer-facing pages (welcome, forms, signatures, dashboard)
+  - Updated admin pages (login, forgot password, header, profiles)
+  - Improved maintainability with consistent naming convention
+
 ### October 28, 2025 - Route Protection & Browser History Management
 - **Route Protection Implementation**: Added comprehensive guards to prevent direct URL access to protected pages:
   - All waiver flow pages (Signature, RuleReminder, AllDone, ConfirmCustomerInfo, UserDashboard) now validate required state

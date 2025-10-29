@@ -12,6 +12,7 @@ function UserDashboard() {
   const phone = location.state?.phone;
   const [customerVisits, setCustomerVisits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isVerified, setIsVerified] = useState(true);
 
   useEffect(() => {
     if (!phone) {
@@ -31,6 +32,7 @@ function UserDashboard() {
         `${BACKEND_URL}/api/waivers/customer-dashboard?phone=${phone}`
       );
       setCustomerVisits(response.data.customers || []);
+      setIsVerified(response.data.isVerified || false);
     } catch (error) {
       console.error("Error fetching customer dashboard:", error);
       toast.error("Failed to load visit history");
@@ -108,7 +110,7 @@ function UserDashboard() {
             </div>
             <div className="col-12 col-md-8 col-xl-8">
               <div className="logo">
-                <img className="img-fluid" src="/assets/img/SKATE_AND_PLAY_V08_Full_Transparency (2) 1.png" alt="logo" />
+                <img className="img-fluid" src="/assets/img/logo.png" alt="logo" />
               </div>
             </div>
           </div>
@@ -120,9 +122,15 @@ function UserDashboard() {
             <p className="text-muted mb-1" style={{ fontSize: '0.95rem' }}>
               Phone: <strong>{formatPhone(phone)}</strong>
             </p>
+            {!isVerified && customerVisits.length > 0 && (
+              <div className="alert alert-warning mx-auto" style={{ maxWidth: '600px', fontSize: '0.9rem' }}>
+                <i className="fas fa-info-circle me-2"></i>
+                <strong>Note:</strong> Please verify your phone number to view your complete visit history.
+              </div>
+            )}
             {customerVisits.length > 0 && (
               <p className="mb-0" style={{ fontSize: '0.95rem', color: '#6C5CE7' }}>
-                <strong>{customerVisits.length}</strong> visit{customerVisits.length !== 1 ? 's' : ''} found
+                <strong>{customerVisits.length}</strong> visit{customerVisits.length !== 1 ? 's' : ''} {isVerified ? 'found' : 'pending verification'}
               </p>
             )}
           </div>

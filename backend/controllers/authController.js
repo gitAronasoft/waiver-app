@@ -146,6 +146,13 @@ const verifyOtp = async (req, res) => {
     // Delete used OTP
     await db.query('DELETE FROM otps WHERE phone = ?', [phone]);
 
+    // Mark all customer records with this phone as verified (status = 1)
+    const [updateResult] = await db.query(
+      'UPDATE customers SET status = 1 WHERE cell_phone = ?',
+      [phone]
+    );
+    console.log(`✅ Updated ${updateResult.affectedRows} customer record(s) to verified status`);
+
     res.json({ 
       authenticated: true, 
       message: 'OTP verified successfully' 

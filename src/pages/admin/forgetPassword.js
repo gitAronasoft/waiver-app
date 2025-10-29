@@ -33,7 +33,7 @@ function ForgotPasswordForm() {
               <div className="logo text-center mb-4">
                 <img
                   className="img-fluid"
-                  src="/assets/img/SKATE_AND_PLAY_V08_Full_Transparency (2) 1.png"
+                  src="/assets/img/logo.png"
                   alt="logo"
                 />
               </div>

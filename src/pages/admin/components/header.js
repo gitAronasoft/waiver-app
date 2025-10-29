@@ -40,7 +40,7 @@ function Header() {
         {/* Logo */}
         <Link className="navbar-brand" to="/admin/home">
           <img
-            src="/assets/img/SKATE_AND_PLAY_V08_Full_Transparency (2) 1.png"
+            src="/assets/img/logo.png"
             className="img-fluid"
             alt="logo"
             style={{ height: "50px" }}
