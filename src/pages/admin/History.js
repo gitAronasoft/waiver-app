@@ -282,8 +282,8 @@ const desktopColumns = [
     name: "Action", 
     cell: row => (
       <div className="d-flex gap-3">
-        <i className="fas fa-eye" style={{ cursor: 'pointer' }} onClick={() => navigate(`/admin/client-profile/${row.id}`)} />
-        <i className="fas fa-trash" style={{ cursor: 'pointer', color: 'red' }} onClick={() => openModal(row, "delete")} />
+        <i className="fas fa-eye" style={{ cursor: 'pointer' }} onClick={() => navigate(`/admin/client-profile/${row.id}`)} title="View Profile" />
+        <i className="fas fa-trash" style={{ cursor: 'pointer', color: 'red' }} onClick={() => openModal(row, "delete")} title="Delete Waiver" />
       </div>
     )
   }

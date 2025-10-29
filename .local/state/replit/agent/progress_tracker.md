@@ -5,6 +5,121 @@
 
 ---
 
+## Session 29 (October 29, 2025) - Fixed User Dashboard Showing Wrong User Details for Specific Waiver:
+
+[x] 271. Identified issue: user dashboard showing current user details instead of historical snapshot when viewing specific waiver
+[x] 272. Updated UserDashboard to pass waiverId instead of customerId when clicking waiver
+[x] 273. Created new backend endpoint /waiver-snapshot to fetch historical waiver snapshot data
+[x] 274. Added route for waiver-snapshot endpoint to waiverRoutes.js
+[x] 275. Updated ConfirmCustomerInfo to use waiver-snapshot endpoint when waiverId is provided
+[x] 276. Restarted Backend API workflow - Successfully running
+[x] 277. Called architect for code review - All fixes approved with Pass ✅
+[x] 278. Updated progress tracker with Session 29 information
+
+### Session 29 Bug Fixed:
+
+**Bug: User Dashboard Shows Wrong User Details When Viewing Specific Waiver** ✅
+- **Problem**: When clicking on a waiver from the user dashboard, the confirm-info page was displaying:
+  - ✅ Correct minors from waiver snapshot (working as expected)
+  - ❌ Wrong user details from current users table (should show historical snapshot)
+- **Expected**: Should show BOTH user details AND minors as they were when that specific waiver was signed (historical accuracy)
+- **Root Cause**: 
+  - UserDashboard was passing `customerId` (user_id) instead of `waiverId`
+  - ConfirmCustomerInfo was fetching current user data from `users` table
+  - No mechanism existed to retrieve historical snapshot data for a specific waiver view
+- **Business Logic**: Each waiver stores a complete snapshot of user and minor data at signing time in snapshot columns (`signer_name`, `signer_email`, `signer_address`, etc. + `minors_snapshot` JSON)
+- **Solution Implemented**:
+  
+  **1. Frontend - UserDashboard.js (line 185-187):**
+  - Changed navigation state from `customerId: waiver.user_id` to `waiverId: waiver.waiver_id`
+  - Added `viewOnly: true` flag to indicate historical view mode
+  
+  **2. Backend - New endpoint (waiverController.js line 348-448):**
+  - Created `getWaiverSnapshot()` endpoint: `/api/waivers/waiver-snapshot`
+  - Fetches waiver record with all snapshot columns (`signer_*` fields)
+  - Parses `minors_snapshot` JSON into array format
+  - Combines snapshot data with current phone fields (not snapshotted)
+  - Returns data in same format as existing endpoints for compatibility
+  
+  **3. Backend - Route added (waiverRoutes.js line 11):**
+  - Added `router.get('/waiver-snapshot', waiverController.getWaiverSnapshot);`
+  - Exported new controller function in module.exports
+  
+  **4. Frontend - ConfirmCustomerInfo.js (lines 15-16, 38-42, 88):**
+  - Added extraction of `waiverId` and `viewOnly` from location.state
+  - Modified useEffect to prioritize waiverId check
+  - If waiverId exists, use `/waiver-snapshot` endpoint
+  - Otherwise, use existing endpoints (preserves normal waiver creation flow)
+  - Updated dependency array to include waiverId
+
+- **Result**: User dashboard now correctly displays historical snapshot data (both user details and minors) as they were when that specific waiver was signed ✅
+
+### Architect Review Summary:
+✅ **Pass** - ConfirmCustomerInfo now requests waiver snapshot when waiverId is supplied
+✅ Historical signer details correctly returned by new backend endpoint
+✅ UserDashboard sends waiverId/viewOnly correctly
+✅ ConfirmCustomerInfo prioritizes waiver-snapshot before legacy lookups
+✅ Normal flow fallback preserved for standard waiver creation
+✅ Backend validates waiverId, returns 404/400 appropriately
+✅ Snapshot columns pulled correctly, minors_snapshot parsed
+✅ Phone fields supplemented from users table
+✅ Response shape matches frontend expectations
+⚠️ **Minor gap noted**: viewOnly flag not yet used to lock down editing (future enhancement suggestion)
+✅ No security concerns observed
+
+### Files Modified:
+1. `src/pages/UserDashboard.js` - Changed to pass waiverId instead of customerId (line 185-187)
+2. `backend/controllers/waiverController.js` - Added getWaiverSnapshot endpoint (line 348-448)
+3. `backend/controllers/waiverController.js` - Added getWaiverSnapshot to exports (line 1600)
+4. `backend/routes/waiverRoutes.js` - Added /waiver-snapshot route (line 11)
+5. `src/pages/ConfirmCustomerInfo.js` - Updated to use waiver-snapshot endpoint when waiverId provided (lines 15-16, 38-42, 88)
+
+**All 278 tasks marked as complete [x]**
+
+---
+
+## Session 28 (October 29, 2025) - Fixed Signature Page Showing Minors from Other Waivers:
+
+[x] 266. Analyzed signature page showing minors from all waivers instead of current waiver only
+[x] 267. Fixed getMinors API endpoint to filter active minors (status = 1) only
+[x] 268. Restarted Backend API workflow - Successfully running
+[x] 269. Called architect for code review - Fix approved ✅ (Query filter correct, business logic aligned)
+[x] 270. Updated progress tracker with Session 28 information
+
+### Session 28 Bug Fixed:
+
+**Bug: Signature Page Shows Minors from Other Waivers** ✅
+- **Problem**: When signing up for a new waiver with a phone number that already has existing waivers, the signature page was showing minors from ALL previous waivers (both active and inactive)
+- **Expected**: Should only show minors from the current waiver
+- **Root Cause**: The `/api/waivers/getminors` endpoint query did not filter by `status` field:
+  - Query was: `SELECT * FROM minors WHERE user_id = ?`
+  - This returned ALL minors regardless of status (active status=1 or inactive status=0)
+- **Business Logic**: 
+  - System uses snapshot pattern where `minors` table contains current active minors
+  - When existing customer creates new waiver, old minors are deactivated (status = 0)
+  - Only new minors from current waiver are active (status = 1)
+  - Each waiver stores historical snapshot in `minors_snapshot` JSON at signing time
+- **Solution**: Added status filter to query in `backend/controllers/waiverController.js` line 753:
+  - Changed to: `SELECT * FROM minors WHERE user_id = ? AND status = 1`
+  - Now only returns active minors from current waiver
+  - Response structure unchanged (spreads customer fields + minors array)
+- **Result**: Signature page now correctly shows only the current waiver's minors, not historical ones ✅
+
+### Architect Review Summary:
+✅ **Approved** - Query filter correctly aligns with business logic
+✅ Backend query properly filters active minors (`status = 1`)
+✅ Response structure verified unchanged (customer fields spread at top level + minors array)
+✅ No other endpoints require adjustment for this flow
+✅ No security concerns observed
+✅ Fix resolves the user-reported issue of seeing minors from other waivers
+
+### Files Modified:
+1. `backend/controllers/waiverController.js` - Added `AND status = 1` filter to getMinors query (line 753)
+
+**All 270 tasks marked as complete [x]**
+
+---
+
 ## Session 27 (October 29, 2025) - Fixed Three New Waiver Flow Issues:
 
 [x] 256. Investigated signature page localStorage persistence issue

@@ -9,27 +9,32 @@ function ConfirmCustomerInfo() {
   const navigate = useNavigate();
   const phone = location.state?.phone;
   const customerId = location.state?.customerId;
+  const waiverId = location.state?.waiverId;
+  const viewOnly = location.state?.viewOnly || false;
   const isReturning = location.state?.isReturning || false;
 
   const [formData, setFormData] = useState(null);
 
   // Route protection: Redirect if accessed directly without valid state
   useEffect(() => {
-    if (!phone && !customerId) {
-      console.warn("No phone or customerId found in state, redirecting to home");
+    if (!phone && !customerId && !waiverId) {
+      console.warn("No phone, customerId, or waiverId found in state, redirecting to home");
       navigate("/", { replace: true });
     }
-  }, [phone, customerId, navigate]);
+  }, [phone, customerId, waiverId, navigate]);
   const [minorList, setMinorList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [minorErrors, setMinorErrors] = useState({});
 
   useEffect(() => {
-    if (phone) {
+    if (phone || waiverId) {
       setLoading(true);
 
-      const endpoint = customerId
+      // If viewing a specific waiver, use snapshot endpoint
+      const endpoint = waiverId
+        ? `${BACKEND_URL}/api/waivers/waiver-snapshot?waiverId=${waiverId}`
+        : customerId
         ? `${BACKEND_URL}/api/waivers/customer-info-by-id?customerId=${customerId}`
         : `${BACKEND_URL}/api/waivers/customer-info?phone=${phone}`;
 
@@ -52,6 +57,11 @@ function ConfirmCustomerInfo() {
           data.cell_phone = formatPhone(data.cell_phone);
           data.work_phone = formatPhone(data.work_phone);
 
+          // ✅ Format DOB for date input (YYYY-MM-DD)
+          if (data.dob) {
+            data.dob = new Date(data.dob).toISOString().split("T")[0];
+          }
+
           data.can_email = data.can_email === 1 || data.can_email === "1";
           setFormData(data);
 
@@ -61,7 +71,7 @@ function ConfirmCustomerInfo() {
               dob: minor.dob
                 ? new Date(minor.dob).toISOString().split("T")[0]
                 : "",
-              checked: minor.status === 1,
+              checked: waiverId ? true : (minor.status === 1), // Always check minors when viewing waiver
               isNew: false,
             }));
             setMinorList(minorsWithFlags);
@@ -77,7 +87,7 @@ function ConfirmCustomerInfo() {
           setLoading(false);
         });
     }
-  }, [phone, customerId]);
+  }, [phone, customerId, waiverId]);
 
   // const handleChange = (e) => {
   //   const { name, value, type } = e.target;
@@ -235,6 +245,7 @@ function ConfirmCustomerInfo() {
           formData: updatedData,
           customerId: formData.id,
           isReturning,
+          waiverId: waiverId, // Pass waiverId to signature page
         },
       });
     } catch (err) {

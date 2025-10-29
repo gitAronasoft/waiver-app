@@ -339,6 +339,112 @@ const getCustomerInfoById = async (req, res) => {
 };
 
 /**
+ * Gets waiver snapshot data by waiver ID
+ * Returns historical customer and minor data as it was when the waiver was signed
+ */
+const getWaiverSnapshot = async (req, res) => {
+  try {
+    const { waiverId } = req.query;
+
+    // Validate waiverId parameter
+    if (!waiverId) {
+      return res.status(400).json({
+        error: "Waiver ID is required",
+      });
+    }
+
+    // Fetch waiver with snapshot data
+    const [waivers] = await db.query(
+      `SELECT 
+        id,
+        user_id,
+        signer_name,
+        signer_email,
+        signer_address,
+        signer_city,
+        signer_province,
+        signer_postal,
+        signer_dob,
+        minors_snapshot,
+        signed_at,
+        created_at
+      FROM waivers 
+      WHERE id = ? LIMIT 1`,
+      [waiverId]
+    );
+
+    if (waivers.length === 0) {
+      return res.status(404).json({
+        error: "Waiver not found",
+      });
+    }
+
+    const waiver = waivers[0];
+
+    // Get current user data for phone and other fields not in snapshot
+    const [users] = await db.query(
+      "SELECT cell_phone, country_code, home_phone, work_phone FROM users WHERE id = ?",
+      [waiver.user_id]
+    );
+
+    // Parse signer_name into first_name and last_name
+    const nameParts = waiver.signer_name ? waiver.signer_name.split(' ') : ['', ''];
+    const first_name = nameParts[0] || '';
+    const last_name = nameParts.slice(1).join(' ') || '';
+
+    // Build customer object from snapshot data
+    const customer = {
+      id: waiver.user_id,
+      first_name,
+      last_name,
+      email: waiver.signer_email,
+      dob: waiver.signer_dob,
+      address: waiver.signer_address,
+      city: waiver.signer_city,
+      province: waiver.signer_province,
+      postal_code: waiver.signer_postal,
+      cell_phone: users.length > 0 ? users[0].cell_phone : null,
+      country_code: users.length > 0 ? users[0].country_code : null,
+      home_phone: users.length > 0 ? users[0].home_phone : null,
+      work_phone: users.length > 0 ? users[0].work_phone : null,
+      can_email: null,
+    };
+
+    // Parse minors from snapshot JSON
+    let minors = [];
+    if (waiver.minors_snapshot) {
+      try {
+        const parsedMinors = JSON.parse(waiver.minors_snapshot);
+        minors = parsedMinors.map((m, index) => ({
+          id: `snapshot_${index}`, // Temporary ID for display purposes
+          first_name: m.first_name,
+          last_name: m.last_name,
+          dob: m.dob,
+          status: 1,
+          checked: true,
+          isSnapshot: true, // Flag to indicate this is historical data
+        }));
+      } catch (parseError) {
+        console.error(`Error parsing minors_snapshot for waiver ${waiverId}:`, parseError);
+      }
+    }
+
+    res.json({ customer, minors });
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching waiver snapshot:`, {
+      message: error.message,
+      waiverId: req.query.waiverId,
+    });
+
+    res.status(500).json({
+      error: "Failed to fetch waiver snapshot",
+      errorId,
+    });
+  }
+};
+
+/**
  * Updates customer information and associated minors
  */
 const updateCustomer = async (req, res) => {
@@ -745,9 +851,9 @@ const getMinors = async (req, res) => {
 
     const customer = customers[0];
 
-    // Fetch associated minors
+    // Fetch associated active minors (only from current waiver)
     const [minors] = await db.query(
-      "SELECT * FROM minors WHERE user_id = ?",
+      "SELECT * FROM minors WHERE user_id = ? AND status = 1",
       [customer.id],
     );
 
@@ -911,63 +1017,42 @@ const verifyWaiver = async (req, res) => {
 };
 
 /**
- * Gets detailed information about a specific waiver
- * Uses snapshot data for historical accuracy
+ * Gets detailed information about a user and all their waivers
+ * Simplified to fetch by user_id instead of waiver_id
  */
 const getWaiverDetails = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // This is now user_id
 
-    // Validate waiver ID
+    // Validate user ID
     if (!id) {
       return res.status(400).json({
-        error: "Waiver ID is required",
+        error: "User ID is required",
       });
     }
 
-    const [waivers] = await db.query(
-      `
-      SELECT 
-        wf.id as waiver_id,
-        wf.signed_at,
-        wf.signature_image,
-        wf.rules_accepted,
-        wf.verified_by_staff,
-        wf.user_id,
-        wf.signer_name,
-        wf.signer_email,
-        wf.signer_address,
-        wf.signer_city,
-        wf.signer_province,
-        wf.signer_postal,
-        wf.signer_dob,
-        wf.minors_snapshot
-      FROM waivers wf
-      WHERE wf.id = ?
-    `,
-      [id],
+    // Fetch user information
+    const [users] = await db.query(
+      `SELECT id, first_name, last_name, email, dob, address, city, province, postal_code, cell_phone, country_code 
+       FROM users WHERE id = ?`,
+      [id]
     );
 
-    if (waivers.length === 0) {
+    if (users.length === 0) {
       return res.status(404).json({
-        error: "Waiver not found",
+        error: "User not found",
       });
     }
 
-    const waiver = waivers[0];
-    const customerId = waiver.user_id;
+    const user = users[0];
 
-    // Parse minors from snapshot JSON instead of querying minors table
-    let minors = [];
-    if (waiver.minors_snapshot) {
-      try {
-        minors = JSON.parse(waiver.minors_snapshot);
-      } catch (parseError) {
-        console.error(`Error parsing minors_snapshot for waiver ${id}:`, parseError);
-      }
-    }
+    // Fetch current active minors (not from snapshot, but current state)
+    const [currentMinors] = await db.query(
+      `SELECT id, first_name, last_name, dob, status FROM minors WHERE user_id = ?`,
+      [id]
+    );
 
-    // Get waiver history for this customer with snapshot data and staff who verified
+    // Get all waivers for this user with staff verification info
     const { convertToEST } = require("../utils/time");
     
     const [waiverHistoryRaw] = await db.query(
@@ -989,7 +1074,7 @@ const getWaiverDetails = async (req, res) => {
       WHERE wf.user_id = ?
       ORDER BY wf.signed_at DESC
     `,
-      [customerId],
+      [id]
     );
 
     // Format signed_at dates using backend timezone conversion
@@ -998,50 +1083,21 @@ const getWaiverDetails = async (req, res) => {
       date: w.signed_at ? convertToEST(w.signed_at, "MMM DD, YYYY [at] hh:mm A") : null
     }));
 
-    // Fetch phone number from users table (not stored in snapshot)
-    const [userData] = await db.query(
-      `SELECT cell_phone, country_code FROM users WHERE id = ?`,
-      [customerId]
-    );
-
-    const userPhone = userData.length > 0 ? userData[0] : {};
-
-    // Build customer object from snapshot data to match expected frontend format
-    const customerData = {
-      id: customerId,
-      waiver_id: waiver.waiver_id,
-      first_name: waiver.signer_name ? waiver.signer_name.split(' ')[0] : '',
-      last_name: waiver.signer_name ? waiver.signer_name.split(' ').slice(1).join(' ') : '',
-      email: waiver.signer_email,
-      dob: waiver.signer_dob,
-      address: waiver.signer_address,
-      city: waiver.signer_city,
-      province: waiver.signer_province,
-      postal_code: waiver.signer_postal,
-      cell_phone: userPhone.cell_phone || null,
-      country_code: userPhone.country_code || null,
-      signed_at: waiver.signed_at,
-      signature_image: waiver.signature_image,
-      rules_accepted: waiver.rules_accepted,
-      verified_by_staff: waiver.verified_by_staff,
-      user_id: waiver.user_id
-    };
-
     // Return data in the format expected by the frontend
     res.json({
-      customer: customerData,
-      minors: minors,
+      customer: user,
+      minors: currentMinors,
       waiverHistory: waiverHistory,
     });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
-    console.error(`[${errorId}] Error fetching waiver details:`, {
+    console.error(`[${errorId}] Error fetching user details:`, {
       message: error.message,
-      waiverId: req.params.id,
+      userId: req.params.id,
     });
 
     res.status(500).json({
-      error: "Failed to fetch waiver details",
+      error: "Failed to fetch user details",
       errorId,
     });
   }
@@ -1150,6 +1206,7 @@ const getAllWaivers = async (req, res) => {
         w.verified_by_staff AS status,
         w.minors_snapshot
       FROM waivers w
+      WHERE w.signed_at IS NOT NULL
       ORDER BY w.signed_at DESC
     `);
 
@@ -1387,6 +1444,9 @@ const getCustomerDashboard = async (req, res) => {
     const hasVerifiedUser = users.some(u => u.status === 1);
     const userIds = users.map(u => u.id);
 
+    // Import timezone utility
+    const { convertToEST } = require("../utils/time");
+
     // Fetch all waivers for these users with snapshot data
     const [waivers] = await db.query(
       `SELECT 
@@ -1455,7 +1515,7 @@ const getCustomerDashboard = async (req, res) => {
         province: waiver.signer_province,
         postal_code: waiver.signer_postal,
         cell_phone: phone,
-        signed_at: waiver.signed_at,
+        signed_at: waiver.signed_at ? convertToEST(waiver.signed_at, "MMM DD, YYYY [at] hh:mm A") : null,
         signature_image: waiver.signature_image,
         rules_accepted: waiver.rules_accepted,
         completed: waiver.completed,
@@ -1488,27 +1548,35 @@ const getCustomerDashboard = async (req, res) => {
 };
 
 /**
- * Fetches the most recent signature for a customer
+ * Fetches signature for a customer or specific waiver
  */
 const getSignature = async (req, res) => {
   try {
-    const { customerId } = req.query;
+    const { customerId, waiverId } = req.query;
 
-    if (!customerId) {
+    if (!customerId && !waiverId) {
       return res.status(400).json({
-        error: "Customer ID is required",
+        error: "Customer ID or Waiver ID is required",
       });
     }
 
-    // Get the most recent waiver with a signature
-    const [waivers] = await db.query(
-      "SELECT signature_image FROM waivers WHERE user_id = ? AND signature_image IS NOT NULL ORDER BY created_at DESC LIMIT 1",
-      [customerId],
-    );
+    let query, params;
+    
+    if (waiverId) {
+      // Get signature from specific waiver
+      query = "SELECT signature_image FROM waivers WHERE id = ? AND signature_image IS NOT NULL LIMIT 1";
+      params = [waiverId];
+    } else {
+      // Get the most recent waiver with a signature for customer
+      query = "SELECT signature_image FROM waivers WHERE user_id = ? AND signature_image IS NOT NULL ORDER BY created_at DESC LIMIT 1";
+      params = [customerId];
+    }
+
+    const [waivers] = await db.query(query, params);
 
     if (waivers.length === 0) {
       return res.status(404).json({
-        error: "No signature found for this customer",
+        error: "No signature found",
       });
     }
 
@@ -1521,6 +1589,7 @@ const getSignature = async (req, res) => {
     console.error(`[${errorId}] Error fetching signature:`, {
       message: error.message,
       customerId: req.query.customerId,
+      waiverId: req.query.waiverId,
     });
 
     res.status(500).json({
@@ -1534,6 +1603,7 @@ module.exports = {
   createWaiver,
   getCustomerInfo,
   getCustomerInfoById,
+  getWaiverSnapshot,
   updateCustomer,
   saveSignature,
   acceptRules,

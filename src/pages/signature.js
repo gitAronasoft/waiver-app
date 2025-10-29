@@ -24,6 +24,7 @@ function Signature() {
   const phone = location.state?.phone;
   const customerId = location.state?.customerId;
   const isReturning = location.state?.isReturning || false;
+  const waiverId = location.state?.waiverId; // Get waiverId if viewing specific waiver
 
   // Route protection: Redirect if accessed directly without valid state
   useEffect(() => {
@@ -136,12 +137,13 @@ function Signature() {
           }));
         }
 
-        // Pre-fill signature for returning users
-        if (isReturning && customerId) {
+        // Pre-fill signature from specific waiver or most recent
+        if (waiverId || (isReturning && customerId)) {
           try {
-            const signatureResponse = await axios.get(
-              `${BACKEND_URL}/api/waivers/get-signature?customerId=${customerId}`
-            );
+            const signatureResponse = waiverId
+              ? await axios.get(`${BACKEND_URL}/api/waivers/get-signature?waiverId=${waiverId}`)
+              : await axios.get(`${BACKEND_URL}/api/waivers/get-signature?customerId=${customerId}`);
+            
             if (signatureResponse.data?.signature) {
               const signatureData = signatureResponse.data.signature;
               setSignatureImage(signatureData);
@@ -410,7 +412,8 @@ function formatPhone(phone = "") {
                               phone, 
                               customerType,
                               customerId,
-                              isReturning
+                              isReturning,
+                              waiverId // Preserve waiverId when going back
                             } 
                           });
                         }

@@ -19,6 +19,7 @@ function ProfilePage() {
   const pdfRef = useRef();
 
   useEffect(() => {
+    // id is now user_id from the URL
     axios
       .get(`${BACKEND_URL}/api/waivers/waiver-details/${id}`)
       .then((res) => {
@@ -26,8 +27,6 @@ function ProfilePage() {
         setMinors(res.data.minors || []);
         setWaiverHistory(res.data.waiverHistory || []);
         setIsLoading(false);
-
-        console.log(res.data.minors, 'data');
       })
       .catch((err) => {
         console.error("Error loading customer:", err);
@@ -112,22 +111,33 @@ function ProfilePage() {
 
 const handleDownloadPDF = async (waiverId) => {
   try {
-    // Fetch the specific waiver's snapshot data
-    const response = await axios.get(`${BACKEND_URL}/api/waivers/waiver-details/${waiverId}`);
-    const waiverData = response.data;
+    // Find the specific waiver from waiverHistory
+    const selectedWaiver = waiverHistory.find(w => w.id === waiverId);
+    if (!selectedWaiver) {
+      console.error("Waiver not found in history");
+      return;
+    }
+    
+    // Parse minors from snapshot
+    let snapshotMinors = [];
+    if (selectedWaiver.minors_snapshot) {
+      try {
+        snapshotMinors = JSON.parse(selectedWaiver.minors_snapshot);
+      } catch (e) {
+        console.error("Error parsing minors snapshot:", e);
+      }
+    }
     
     // Store original state
     const originalCustomer = customer;
     const originalMinors = minors;
     const originalWaiverHistory = waiverHistory;
     
-    // Create a temporary waiver history with only the selected waiver's data
-    const selectedWaiver = waiverHistory.find(w => w.id === waiverId);
-    const tempWaiverHistory = selectedWaiver ? [selectedWaiver] : [];
+    // Create a temporary waiver history with only the selected waiver
+    const tempWaiverHistory = [selectedWaiver];
     
-    // Update state with waiver-specific snapshot data
-    setCustomer(waiverData.customer);
-    setMinors(waiverData.minors || []);
+    // Update state to show only this waiver's data
+    setMinors(snapshotMinors);
     setWaiverHistory(tempWaiverHistory);
     
     // Wait for React to re-render with new data

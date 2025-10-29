@@ -99,17 +99,10 @@ function UserDashboard() {
       `}</style>
       <div className="container-fluid" style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
         <div className="container py-3">
-          {/* Header Section with Logo and Back Button */}
+          {/* Header Section with Logo */}
           <div className="row">
-            <div className="col-md-2">
-              <div className="back-btn">
-                <Link to="/existing-customer">
-                  <img className="img-fluid" src="/assets/img/image 298.png" alt="back-icon" /> BACK
-                </Link>
-              </div>
-            </div>
-            <div className="col-12 col-md-8 col-xl-8">
-              <div className="logo">
+            <div className="col-12">
+              <div className="logo text-center">
                 <img className="img-fluid" src="/assets/img/logo.png" alt="logo" />
               </div>
             </div>
@@ -173,7 +166,7 @@ function UserDashboard() {
                         <tr>
                           <th className="py-3 px-3" style={{ fontWeight: '600', width: '15%' }}>Waiver ID</th>
                           <th className="py-3 px-3" style={{ fontWeight: '600', width: '25%' }}>Name</th>
-                          <th className="py-3 px-3" style={{ fontWeight: '600', width: '30%' }}>Date & Time</th>
+                          <th className="py-3 px-3" style={{ fontWeight: '600', width: '30%' }}>Signed Date & Time</th>
                           <th className="py-3 px-3" style={{ fontWeight: '600', width: '15%' }}>Minors</th>
                           <th className="py-3 px-3 text-center" style={{ fontWeight: '600', width: '15%' }}>Status</th>
                         </tr>
@@ -186,8 +179,9 @@ function UserDashboard() {
                               onClick={() => navigate("/confirm-info", { 
                                 state: { 
                                   phone, 
-                                  customerId: waiver.user_id,
-                                  isReturning: true
+                                  waiverId: waiver.waiver_id,
+                                  isReturning: true,
+                                  viewOnly: true
                                 } 
                               })}
                               style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
@@ -212,7 +206,7 @@ function UserDashboard() {
                               <td className="py-3 px-3 align-middle">
                                 <div style={{ color: '#495057' }}>
                                   <i className="fas fa-calendar-alt me-2" style={{ color: '#6C5CE7' }}></i>
-                                  {formatDate(waiver.signed_at || waiver.created_at)}
+                                  {waiver.signed_at || 'N/A'}
                                 </div>
                               </td>
                               <td className="py-3 px-3 align-middle">
