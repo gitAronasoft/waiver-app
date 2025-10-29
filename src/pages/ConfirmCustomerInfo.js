@@ -14,6 +14,10 @@ function ConfirmCustomerInfo() {
   const isReturning = location.state?.isReturning || false;
 
   const [formData, setFormData] = useState(null);
+  const [originalData, setOriginalData] = useState(null);
+  const [originalMinors, setOriginalMinors] = useState([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [waiverInfo, setWaiverInfo] = useState(null);
 
   // Route protection: Redirect if accessed directly without valid state
   useEffect(() => {
@@ -64,6 +68,16 @@ function ConfirmCustomerInfo() {
 
           data.can_email = data.can_email === 1 || data.can_email === "1";
           setFormData(data);
+          
+          // Store waiver info (rules_accepted, completed) when viewing a waiver
+          if (waiverId && res.data.waiver) {
+            setWaiverInfo(res.data.waiver);
+          }
+          
+          // Store original data for comparison when viewing a waiver
+          if (waiverId) {
+            setOriginalData(JSON.parse(JSON.stringify(data)));
+          }
 
           if (res.data.minors) {
             const minorsWithFlags = res.data.minors.map((minor) => ({
@@ -75,6 +89,11 @@ function ConfirmCustomerInfo() {
               isNew: false,
             }));
             setMinorList(minorsWithFlags);
+            
+            // Store original minors for comparison when viewing a waiver
+            if (waiverId) {
+              setOriginalMinors(JSON.parse(JSON.stringify(minorsWithFlags)));
+            }
           }
         })
         .catch((err) => {
@@ -192,6 +211,40 @@ function ConfirmCustomerInfo() {
     setMinorErrors(newErrors);
   };
 
+  // Function to detect if any modifications were made
+  const hasModifications = () => {
+    if (!waiverId || !originalData || !originalMinors) {
+      return false; // Not viewing a waiver, so no modification detection needed
+    }
+
+    // Check for new minors added
+    const newMinorsAdded = minorList.some(m => m.isNew);
+    if (newMinorsAdded) return true;
+
+    // Check if number of minors changed
+    if (minorList.length !== originalMinors.length) return true;
+
+    // Check for changes in minor checked status or data
+    for (let i = 0; i < minorList.length; i++) {
+      const current = minorList[i];
+      const original = originalMinors.find(m => m.id === current.id);
+      
+      if (!original) return true; // Minor was removed or added
+      
+      // Check if checked status changed
+      if (current.checked !== original.checked) return true;
+      
+      // Check if minor data changed (shouldn't happen as fields are readonly, but checking anyway)
+      if (current.first_name !== original.first_name ||
+          current.last_name !== original.last_name ||
+          current.dob !== original.dob) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   const goToSignature = async () => {
     // Validate all new minors and show errors
     const isValid = validateAllNewMinors();
@@ -214,46 +267,68 @@ function ConfirmCustomerInfo() {
       return;
     }
 
-    setUpdating(true);
-    try {
-      const stripMask = (val) => (val ? val.replace(/\D/g, "") : "");
-      const updatedData = {
-        ...formData,
-
-        cell_phone: stripMask(formData.cell_phone),
-
-        minors: minorList.map((minor) => ({
-          id: minor.id,
-          first_name: minor.first_name,
-          last_name: minor.last_name,
-          dob: minor.dob,
-          isNew: minor.isNew,
-          checked: minor.checked,
-        })),
-      };
-
-      // Always update customer data to save any changes made
-      await axios.post(
-        `${BACKEND_URL}/api/waivers/update-customer`,
-        updatedData,
-      );
-
-      navigate("/signature", {
-        replace: true,
-        state: {
-          phone,
-          formData: updatedData,
-          customerId: formData.id,
-          isReturning,
-          waiverId: waiverId, // Pass waiverId to signature page
-        },
-      });
-    } catch (err) {
-      console.error("Error updating customer:", err);
-      toast.error("Failed to update customer info.");
-    } finally {
-      setUpdating(false);
+    // Check if viewing a waiver and modifications were made
+    if (waiverId && hasModifications()) {
+      // Show confirmation dialog
+      setShowConfirmDialog(true);
+      return;
     }
+
+    // If no modifications or not viewing a waiver, proceed normally
+    proceedToSignature();
+  };
+
+  const proceedToSignature = async () => {
+    setShowConfirmDialog(false);
+    
+    const isModified = hasModifications();
+    const stripMask = (val) => (val ? val.replace(/\D/g, "") : "");
+    const updatedData = {
+      ...formData,
+      cell_phone: stripMask(formData.cell_phone),
+      minors: minorList.map((minor) => ({
+        id: minor.id,
+        first_name: minor.first_name,
+        last_name: minor.last_name,
+        dob: minor.dob,
+        isNew: minor.isNew,
+        checked: minor.checked,
+      })),
+    };
+
+    // Only update customer data if modifications were made
+    if (isModified) {
+      setUpdating(true);
+      try {
+        await axios.post(
+          `${BACKEND_URL}/api/waivers/update-customer`,
+          updatedData,
+        );
+      } catch (err) {
+        console.error("Error updating customer:", err);
+        toast.error("Failed to update customer info.");
+        setUpdating(false);
+        return;
+      } finally {
+        setUpdating(false);
+      }
+    }
+
+    // Always navigate to signature page
+    // Pass viewCompleted flag to skip rules if waiver is already completed
+    navigate("/signature", {
+      replace: true,
+      state: {
+        phone,
+        formData: updatedData,
+        customerId: formData.id,
+        isReturning,
+        waiverId: isModified ? null : waiverId, // Clear waiverId if modified to create new waiver
+        createNewWaiver: isModified, // Flag to indicate this should create a new waiver
+        viewMode: !isModified && waiverId, // View mode if viewing without modifications
+        viewCompleted: !isModified && waiverId && waiverInfo?.rules_accepted === 1, // Skip rules if completed
+      },
+    });
   };
   if (loading || !formData) {
     return <div className="text-center mt-5">Loading customer info...</div>;
@@ -663,7 +738,7 @@ function ConfirmCustomerInfo() {
                       minWidth: "200px",
                     }}
                   >
-                    {updating ? "Confirming..." : "Confirm"}
+                    {updating ? "Processing..." : hasModifications() ? "Confirm" : "Continue"}
                   </button>
                 </div>
               </div>           
@@ -671,6 +746,81 @@ function ConfirmCustomerInfo() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog for Modified Waiver */}
+      {showConfirmDialog && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+          onClick={() => setShowConfirmDialog(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              padding: "30px",
+              borderRadius: "12px",
+              maxWidth: "500px",
+              width: "90%",
+              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 style={{ marginBottom: "20px", color: "#333", fontWeight: "600" }}>
+              Confirm Changes
+            </h4>
+            <p style={{ marginBottom: "25px", color: "#666", lineHeight: "1.6" }}>
+              You have made changes to the waiver information. Proceeding will create a new waiver that requires your signature.
+              Do you want to continue with these changes?
+            </p>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setShowConfirmDialog(false)}
+                style={{
+                  padding: "10px 24px",
+                  borderRadius: "8px",
+                  border: "1px solid #ddd",
+                  backgroundColor: "white",
+                  color: "#666",
+                  fontSize: "15px",
+                  fontWeight: "500",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={proceedToSignature}
+                disabled={updating}
+                style={{
+                  padding: "10px 24px",
+                  borderRadius: "8px",
+                  border: "none",
+                  backgroundColor: "#007bff",
+                  color: "white",
+                  fontSize: "15px",
+                  fontWeight: "500",
+                  cursor: updating ? "not-allowed" : "pointer",
+                  opacity: updating ? 0.7 : 1,
+                }}
+              >
+                {updating ? "Processing..." : "Yes, Continue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

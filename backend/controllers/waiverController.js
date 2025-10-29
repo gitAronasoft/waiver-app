@@ -367,7 +367,9 @@ const getWaiverSnapshot = async (req, res) => {
         signer_dob,
         minors_snapshot,
         signed_at,
-        created_at
+        created_at,
+        rules_accepted,
+        completed
       FROM waivers 
       WHERE id = ? LIMIT 1`,
       [waiverId]
@@ -429,7 +431,14 @@ const getWaiverSnapshot = async (req, res) => {
       }
     }
 
-    res.json({ customer, minors });
+    res.json({ 
+      customer, 
+      minors,
+      waiver: {
+        rules_accepted: waiver.rules_accepted,
+        completed: waiver.completed
+      }
+    });
   } catch (error) {
     const errorId = `ERR_${Date.now()}`;
     console.error(`[${errorId}] Error fetching waiver snapshot:`, {
@@ -649,13 +658,16 @@ const saveSignature = async (req, res) => {
       console.log(`🗑️ Deleted ${minorsToDelete.length} minor(s) from user ${id}`);
     }
 
-    // Fetch updated minors for snapshot
-    const [currentMinors] = await db.query(
-      "SELECT first_name, last_name, dob FROM minors WHERE user_id = ? AND status = 1",
-      [id]
-    );
+    // Build snapshot data using submitted minors that are checked
+    // This ensures the snapshot reflects the exact minors selected for this waiver
+    const checkedMinors = (minors || [])
+      .filter(m => m.checked)
+      .map(m => ({
+        first_name: m.first_name,
+        last_name: m.last_name,
+        dob: m.dob
+      }));
 
-    // Build snapshot data
     const snapshotData = {
       signer_name: `${user.first_name} ${user.last_name}`,
       signer_email: user.email,
@@ -664,7 +676,7 @@ const saveSignature = async (req, res) => {
       signer_province: user.province,
       signer_postal: user.postal_code,
       signer_dob: user.dob,
-      minors_snapshot: JSON.stringify(currentMinors)
+      minors_snapshot: JSON.stringify(checkedMinors)
     };
 
     // Update the existing waiver (created during user registration) with signature and snapshot

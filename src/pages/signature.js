@@ -25,6 +25,9 @@ function Signature() {
   const customerId = location.state?.customerId;
   const isReturning = location.state?.isReturning || false;
   const waiverId = location.state?.waiverId; // Get waiverId if viewing specific waiver
+  const viewMode = location.state?.viewMode || false; // View mode - no submission
+  const createNewWaiver = location.state?.createNewWaiver || false; // Creating new waiver from modified data
+  const viewCompleted = location.state?.viewCompleted || false; // Skip rules if already completed
 
   // Route protection: Redirect if accessed directly without valid state
   useEffect(() => {
@@ -245,6 +248,26 @@ function Signature() {
   };
 
   const handleSubmit = async () => {
+    // If viewing a completed waiver, redirect directly to My Waivers
+    if (viewCompleted) {
+      navigate("/my-waivers", {
+        replace: true,
+        state: {
+          phone,
+        },
+      });
+      return;
+    }
+
+    // If in view mode, just navigate to rules without submitting
+    if (viewMode) {
+      navigate("/rules", {
+        replace: true,
+        state: { userId: customerData?.id, phone, customerType },
+      });
+      return;
+    }
+
     // Prevent multiple submissions immediately
     if (submitting) return;
     setSubmitting(true);
@@ -738,7 +761,15 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
                     minWidth: '500px'
                   }}
                 >
-                  {submitting ? "Submitting..." : "Accept and continue"}
+                  {submitting 
+                    ? "Processing..." 
+                    : viewCompleted
+                      ? "Return to My Waivers"
+                      : viewMode 
+                        ? "Return to My Waivers" 
+                        : createNewWaiver 
+                          ? "Accept and continue"
+                          : "Accept and continue"}
                 </button>
               </div>
             </div>

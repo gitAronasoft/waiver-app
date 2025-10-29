@@ -8,18 +8,25 @@ function AllDone() {
   const location = useLocation();
   const [countdown, setCountdown] = useState(5); // 5-second countdown
   const completed = location.state?.completed;
+  const skipToMyWaivers = location.state?.skipToMyWaivers;
+  const phone = location.state?.phone;
 
   const handleReturn = () => {
-    // Clear all form data and redirect to home
+    // Clear all form data
     localStorage.removeItem("signatureForm");
     localStorage.removeItem("customerForm");
-    // Replace current entry and navigate home
-    navigate("/", { replace: true });
+    
+    // Redirect based on skipToMyWaivers flag
+    if (skipToMyWaivers && phone) {
+      navigate("/my-waivers", { replace: true, state: { phone } });
+    } else {
+      navigate("/", { replace: true });
+    }
   };
 
   useEffect(() => {
     // Route protection: Only accessible if coming from valid flow
-    if (!completed) {
+    if (!completed && !skipToMyWaivers) {
       console.warn("Direct access to AllDone page blocked, redirecting to home");
       navigate("/", { replace: true });
       return;
@@ -34,15 +41,19 @@ function AllDone() {
       setCountdown((prev) => {
         if (prev === 1) {
           clearInterval(interval);
-          // Clear history stack and redirect to home
-          navigate("/", { replace: true });
+          // Redirect based on skipToMyWaivers flag
+          if (skipToMyWaivers && phone) {
+            navigate("/my-waivers", { replace: true, state: { phone } });
+          } else {
+            navigate("/", { replace: true });
+          }
         }
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [navigate, completed]);
+  }, [navigate, completed, skipToMyWaivers, phone]);
 
 
   return (
@@ -72,7 +83,7 @@ function AllDone() {
             </h3>
 
             <p style={{ fontSize: "1.2rem", marginTop: "10px" }}>
-              Redirecting to the main screen in <strong>{countdown}</strong> seconds...
+              Redirecting to {skipToMyWaivers ? "My Waivers" : "the main screen"} in <strong>{countdown}</strong> seconds...
             </p>
 
             <div className="mx-auto text-center">
@@ -80,7 +91,7 @@ function AllDone() {
                 className="return-btn btn btn-primary mt-3 text-center"
                 onClick={handleReturn}
               >
-                Return to the MAIN screen now
+                {skipToMyWaivers ? "Return to My Waivers now" : "Return to the MAIN screen now"}
               </button>
             </div>
           </div>
