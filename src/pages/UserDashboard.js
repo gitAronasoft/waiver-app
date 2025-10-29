@@ -242,36 +242,24 @@ function UserDashboard() {
 
                 {/* Action Buttons */}
                 <div className="text-center mt-4 mb-3">
-                  <Link 
-                    to="/new-customer" 
-                    className="btn me-2 px-4 py-2" 
-                    style={{ 
-                      borderRadius: '8px', 
-                      fontWeight: '500', 
-                      fontSize: '0.95rem',
-                      backgroundColor: '#6C5CE7',
-                      color: '#fff',
-                      border: 'none'
+                  <button 
+                    onClick={() => {
+                      localStorage.clear();
+                      navigate("/", { replace: true });
                     }}
-                  >
-                    <i className="fas fa-plus me-2"></i>
-                    Sign New Waiver
-                  </Link>
-                  <Link 
-                    to="/" 
                     className="btn px-4 py-2" 
                     style={{ 
                       borderRadius: '8px', 
                       fontWeight: '500', 
                       fontSize: '0.95rem',
-                      backgroundColor: '#fff',
-                      color: '#6C5CE7',
-                      border: '2px solid #6C5CE7'
+                      backgroundColor: '#FF6B6B',
+                      color: '#fff',
+                      border: 'none'
                     }}
                   >
-                    <i className="fas fa-home me-2"></i>
-                    Home
-                  </Link>
+                    <i className="fas fa-sign-out-alt me-2"></i>
+                    Logout
+                  </button>
                 </div>
               </>
             )}

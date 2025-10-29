@@ -12,13 +12,13 @@ cron.schedule("0 * * * *", async () => {
 
   try {
     const [waivers] = await db.query(`
-      SELECT wf.id AS waiver_id, wf.*, c.* 
-      FROM waiver_forms wf
-      JOIN customers c ON wf.user_id = c.id
-      WHERE wf.signed_at IS NOT NULL
-      AND TIMESTAMPDIFF(HOUR, wf.signed_at, UTC_TIMESTAMP()) >= 3
-      AND wf.completed = 1
-      AND (wf.rating_email_sent = 0 OR wf.rating_sms_sent = 0)
+      SELECT w.id AS waiver_id, w.*, u.* 
+      FROM waivers w
+      JOIN users u ON w.user_id = u.id
+      WHERE w.signed_at IS NOT NULL
+      AND TIMESTAMPDIFF(HOUR, w.signed_at, UTC_TIMESTAMP()) >= 3
+      AND w.completed = 1
+      AND (w.rating_email_sent = 0 OR w.rating_sms_sent = 0)
     `);
 
     console.log(`Found ${waivers.length} waivers pending rating messages`);
@@ -35,13 +35,13 @@ cron.schedule("0 * * * *", async () => {
       //     if (waiver.email && waiver.email.trim() !== "") {
       //       await sendRatingEmail(waiver);
       //       await db.query(
-      //         `UPDATE waiver_forms SET rating_email_sent = 1 WHERE id = ?`,
+      //         `UPDATE waivers SET rating_email_sent = 1 WHERE id = ?`,
       //         [waiver.waiver_id]
       //       );
       //       console.log(`📧 Email sent to ${waiver.email}`);
       //     } else {
       //       await db.query(
-      //         `UPDATE waiver_forms SET rating_email_sent = 2 WHERE id = ?`,
+      //         `UPDATE waivers SET rating_email_sent = 2 WHERE id = ?`,
       //         [waiver.waiver_id]
       //       );
       //       console.warn(
@@ -54,7 +54,7 @@ cron.schedule("0 * * * *", async () => {
       //       err.message
       //     );
       //     await db.query(
-      //       `UPDATE waiver_forms SET rating_email_sent = 2 WHERE id = ?`,
+      //       `UPDATE waivers SET rating_email_sent = 2 WHERE id = ?`,
       //       [waiver.waiver_id]
       //     );
       //   }
@@ -66,7 +66,7 @@ cron.schedule("0 * * * *", async () => {
       //     if (waiver.cell_phone && waiver.cell_phone.trim() !== "") {
       //       await sendRatingSMS(waiver);
       //       await db.query(
-      //         `UPDATE waiver_forms SET rating_sms_sent = 1 WHERE id = ?`,
+      //         `UPDATE waivers SET rating_sms_sent = 1 WHERE id = ?`,
       //         [waiver.waiver_id]
       //       );
       //       console.log(
@@ -74,7 +74,7 @@ cron.schedule("0 * * * *", async () => {
       //       );
       //     } else {
       //       await db.query(
-      //         `UPDATE waiver_forms SET rating_sms_sent = 2 WHERE id = ?`,
+      //         `UPDATE waivers SET rating_sms_sent = 2 WHERE id = ?`,
       //         [waiver.waiver_id]
       //       );
       //       console.warn(
@@ -87,7 +87,7 @@ cron.schedule("0 * * * *", async () => {
       //       err.message
       //     );
       //     await db.query(
-      //       `UPDATE waiver_forms SET rating_sms_sent = 2 WHERE id = ?`,
+      //       `UPDATE waivers SET rating_sms_sent = 2 WHERE id = ?`,
       //       [waiver.waiver_id]
       //     );
       //   }

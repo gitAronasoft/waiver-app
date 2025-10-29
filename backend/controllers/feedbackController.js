@@ -27,15 +27,15 @@ const sendFeedback = async (req, res) => {
       });
     }
 
-    // Get customer info
+    // Get user info
     const [customers] = await db.query(
-      'SELECT first_name, last_name, email FROM customers WHERE id = ?',
+      'SELECT first_name, last_name, email FROM users WHERE id = ?',
       [user_id]
     );
 
     if (customers.length === 0) {
       return res.status(404).json({ 
-        error: 'Customer not found' 
+        error: 'User not found' 
       });
     }
 
@@ -149,13 +149,13 @@ const getRatingInfo = async (req, res) => {
     }
 
     const [customers] = await db.query(
-      'SELECT first_name, last_name, email FROM customers WHERE id = ?',
+      'SELECT first_name, last_name, email FROM users WHERE id = ?',
       [userId]
     );
 
     if (customers.length === 0) {
       return res.status(404).json({ 
-        error: 'Customer not found' 
+        error: 'User not found' 
       });
     }
 
@@ -194,7 +194,7 @@ const getAllFeedback = async (req, res) => {
         c.email,
         c.cell_phone
       FROM feedback f
-      JOIN customers c ON f.user_id = c.id
+      JOIN users c ON f.user_id = c.id
       ORDER BY f.created_at DESC
     `);
 

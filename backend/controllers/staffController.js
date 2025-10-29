@@ -431,12 +431,12 @@ const changePassword = async (req, res) => {
 };
 
 /**
- * Gets list of all staff members (excludes passwords and superadmins)
+ * Gets list of all staff members (excludes passwords)
  */
 const getAllStaff = async (req, res) => {
   try {
     const [staff] = await db.query(
-      'SELECT id, name, email, role, status, profile_image, created_at FROM staff WHERE is_superadmin = 0 ORDER BY created_at DESC'
+      'SELECT id, name, email, role, status, profile_image, created_at FROM staff ORDER BY created_at DESC'
     );
 
     res.json(staff);

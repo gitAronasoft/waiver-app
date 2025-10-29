@@ -28,15 +28,15 @@ const sendOtp = async (req, res) => {
       });
     }
 
-    // Check if customer exists
+    // Check if user exists
     const [results] = await db.query(
-      'SELECT id FROM customers WHERE cell_phone = ?', 
+      'SELECT id FROM users WHERE cell_phone = ?', 
       [phone]
     );
     
     if (results.length === 0) {
       return res.status(404).json({ 
-        error: 'Customer not found' 
+        error: 'User not found' 
       });
     }
 
@@ -146,12 +146,12 @@ const verifyOtp = async (req, res) => {
     // Delete used OTP
     await db.query('DELETE FROM otps WHERE phone = ?', [phone]);
 
-    // Mark all customer records with this phone as verified (status = 1)
+    // Mark user record with this phone as verified (status = 1)
     const [updateResult] = await db.query(
-      'UPDATE customers SET status = 1 WHERE cell_phone = ?',
+      'UPDATE users SET status = 1 WHERE cell_phone = ?',
       [phone]
     );
-    console.log(`✅ Updated ${updateResult.affectedRows} customer record(s) to verified status`);
+    console.log(`✅ Updated user record to verified status`);
 
     res.json({ 
       authenticated: true, 

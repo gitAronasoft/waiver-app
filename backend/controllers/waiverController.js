@@ -12,8 +12,8 @@ const client = twilio(
  * Uses transaction to ensure data consistency
  *
  * Index suggestions:
- * - CREATE INDEX idx_customers_cell_phone ON customers(cell_phone)
- * - CREATE INDEX idx_minors_customer_id ON minors(customer_id)
+ * - CREATE INDEX idx_users_cell_phone ON users(cell_phone)
+ * - CREATE INDEX idx_minors_user_id ON minors(user_id)
  */
 const createWaiver = async (req, res) => {
   const connection = await db.getConnection();
@@ -56,55 +56,98 @@ const createWaiver = async (req, res) => {
       });
     }
 
-    // ALWAYS create a NEW customer record (even if phone number exists)
-    // This allows multiple customers with same phone but different names/addresses
-    const [result] = await connection.query(
-      `INSERT INTO customers 
-      (first_name, last_name, email, dob, address, city, 
-       province, postal_code, country_code, cell_phone, status) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-      [
-        first_name,
-        last_name,
-        email,
-        dob, 
-        address,
-        city,
-        province,
-        postal_code,
-        country_code,
-        cell_phone,
-      ],
+    // Check if user exists with this phone number (ONE user per phone)
+    const [existingUsers] = await connection.query(
+      `SELECT id FROM users WHERE cell_phone = ?`,
+      [cell_phone]
     );
-    const customerId = result.insertId;
-    console.log(`✅ Created new customer (ID: ${customerId}) - Phone: ${cell_phone}`);
+
+    let userId;
     
-    // Insert minors for this customer
+    if (existingUsers.length > 0) {
+      // User exists - UPDATE with latest info
+      userId = existingUsers[0].id;
+      await connection.query(
+        `UPDATE users 
+        SET first_name = ?, last_name = ?, email = ?, dob = ?, 
+            address = ?, city = ?, province = ?, postal_code = ?, 
+            country_code = ?, updated_at = NOW()
+        WHERE id = ?`,
+        [
+          first_name,
+          last_name,
+          email,
+          dob,
+          address,
+          city,
+          province,
+          postal_code,
+          country_code,
+          userId,
+        ]
+      );
+      console.log(`✅ Updated existing user (ID: ${userId}) - Phone: ${cell_phone}`);
+    } else {
+      // User does NOT exist - INSERT new user record
+      const [result] = await connection.query(
+        `INSERT INTO users 
+        (first_name, last_name, email, dob, address, city, 
+         province, postal_code, country_code, cell_phone, status) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        [
+          first_name,
+          last_name,
+          email,
+          dob,
+          address,
+          city,
+          province,
+          postal_code,
+          country_code,
+          cell_phone,
+        ]
+      );
+      userId = result.insertId;
+      console.log(`✅ Created new user (ID: ${userId}) - Phone: ${cell_phone}`);
+    }
+    
+    // Handle minors for this user
+    if (existingUsers.length > 0) {
+      // For EXISTING users: deactivate old minors before inserting new ones
+      // This prevents duplicate/obsolete minors from accumulating
+      await connection.query(
+        "UPDATE minors SET status = 0 WHERE user_id = ?",
+        [userId]
+      );
+      console.log(`✅ Deactivated old minors for existing user ${userId}`);
+    }
+    
+    // Insert new minors for this user (both new and existing users)
     if (minors && minors.length > 0) {
       const minorValues = minors.map((minor) => [
-        customerId,
+        userId,
         minor.first_name,
         minor.last_name,
         minor.dob,
-        1,
+        1, // status = 1 (active)
       ]);
 
       await connection.query(
-        "INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES ?",
+        "INSERT INTO minors (user_id, first_name, last_name, dob, status) VALUES ?",
         [minorValues],
       );
       
-      console.log(`✅ Added ${minors.length} minor(s) for customer ${customerId}`);
+      console.log(`✅ Added ${minors.length} minor(s) for user ${userId}`);
     }
 
-    // Create waiver form entry
+    // Create waiver entry
     const [waiverResult] = await connection.query(
-      "INSERT INTO waiver_forms (customer_id, signed_at, completed, verified_by_staff, staff_id) VALUES (?, NULL, 0, 0, 0)",
-      [customerId],
+      "INSERT INTO waivers (user_id, signed_at, completed, verified_by_staff, staff_id) VALUES (?, NULL, 0, 0, 0)",
+      [userId],
     );
 
     const waiverId = waiverResult.insertId;
-    console.log(`✅ Created waiver (ID: ${waiverId}) for customer ${customerId}`)
+    console.log(`✅ Created waiver (ID: ${waiverId}) for user ${userId}`)
 
     // SEND OTP via SMS for all new customer signups
     if (send_otp) {
@@ -125,7 +168,7 @@ const createWaiver = async (req, res) => {
         );
 
         console.log(
-          `📝 OTP stored in database for new customer - Phone: ${cell_phone}, OTP: ${otp}`,
+          `📝 OTP stored in database for user - Phone: ${cell_phone}, OTP: ${otp}`,
         );
 
         // Send OTP via SMS
@@ -141,11 +184,11 @@ const createWaiver = async (req, res) => {
             to: formattedPhone,
           });
           console.log(
-            `✅ OTP SMS sent to new customer ${formattedPhone}: ${otp}`,
+            `✅ OTP SMS sent to user ${formattedPhone}: ${otp}`,
           );
         } catch (twilioError) {
           console.error(
-            `⚠️ Twilio SMS failed for new customer:`,
+            `⚠️ Twilio SMS failed for user:`,
             twilioError.message,
           );
           // Don't fail the request if SMS fails
@@ -153,11 +196,11 @@ const createWaiver = async (req, res) => {
 
         // Log OTP in development
         if (process.env.NODE_ENV === "development") {
-          console.log(`[DEV] OTP for new customer ${cell_phone}: ${otp}`);
+          console.log(`[DEV] OTP for user ${cell_phone}: ${otp}`);
         }
       } catch (otpError) {
         console.error(
-          "⚠️ Error generating OTP for new customer:",
+          "⚠️ Error generating OTP for user:",
           otpError.message,
         );
         // Don't fail the waiver creation if OTP fails
@@ -171,7 +214,7 @@ const createWaiver = async (req, res) => {
       message: send_otp
         ? "Waiver created and OTP sent successfully"
         : "Waiver created successfully",
-      customerId,
+      userId,
       waiverId,
     });
   } catch (error) {
@@ -214,7 +257,7 @@ const getCustomerInfo = async (req, res) => {
     // This ensures that when the same phone number is used for multiple signups,
     // we return the newest customer data instead of the oldest
     const [customers] = await db.query(
-      "SELECT * FROM customers WHERE cell_phone = ? ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM users WHERE cell_phone = ? ORDER BY created_at DESC LIMIT 1",
       [phone],
     );
 
@@ -227,7 +270,7 @@ const getCustomerInfo = async (req, res) => {
     const customer = customers[0];
 
     const [minors] = await db.query(
-      "SELECT * FROM minors WHERE customer_id = ? AND status = 1",
+      "SELECT * FROM minors WHERE user_id = ? AND status = 1",
       [customer.id],
     );
 
@@ -262,7 +305,7 @@ const getCustomerInfoById = async (req, res) => {
     }
 
     const [customers] = await db.query(
-      "SELECT * FROM customers WHERE id = ? LIMIT 1",
+      "SELECT * FROM users WHERE id = ? LIMIT 1",
       [customerId],
     );
 
@@ -276,7 +319,7 @@ const getCustomerInfoById = async (req, res) => {
 
     // Get ALL minors for this customer (not just status = 1)
     const [minors] = await db.query(
-      "SELECT * FROM minors WHERE customer_id = ?",
+      "SELECT * FROM minors WHERE user_id = ?",
       [customer.id],
     );
 
@@ -331,7 +374,7 @@ const updateCustomer = async (req, res) => {
 
     // Check if customer exists
     const [existingCustomer] = await db.query(
-      "SELECT id FROM customers WHERE id = ?",
+      "SELECT id FROM users WHERE id = ?",
       [id],
     );
 
@@ -366,7 +409,7 @@ const updateCustomer = async (req, res) => {
       for (const minor of minors) {
         if (minor.isNew) {
           await db.query(
-            "INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO minors (user_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, ?)",
             [
               id,
               minor.first_name,
@@ -390,7 +433,7 @@ const updateCustomer = async (req, res) => {
       }
     }
 
-    // Minors are already linked to customer via customer_id, no junction table needed
+    // Minors are already linked to customer via user_id, no junction table needed
     console.log(`✅ Minors updated for customer ${id}`);
 
     res.json({
@@ -430,14 +473,28 @@ const saveSignature = async (req, res) => {
     // Validate required fields
     if (!id || !signature) {
       return res.status(400).json({
-        error: "Customer ID and signature are required",
+        error: "User ID and signature are required",
       });
     }
+
+    // Fetch current user data for snapshot
+    const [users] = await db.query(
+      "SELECT first_name, last_name, email, address, city, province, postal_code, dob FROM users WHERE id = ?",
+      [id]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        error: "User not found",
+      });
+    }
+
+    const user = users[0];
 
     // Handle minors: add, update, and remove
     // Get existing minors from database
     const [existingMinors] = await db.query(
-      "SELECT id FROM minors WHERE customer_id = ?",
+      "SELECT id FROM minors WHERE user_id = ?",
       [id],
     );
     
@@ -450,7 +507,7 @@ const saveSignature = async (req, res) => {
         if (minor.isNew) {
           // Insert new minor
           await db.query(
-            "INSERT INTO minors (customer_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO minors (user_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, ?)",
             [
               id,
               minor.first_name,
@@ -483,38 +540,87 @@ const saveSignature = async (req, res) => {
         "DELETE FROM minors WHERE id IN (?)",
         [minorsToDelete],
       );
-      console.log(`🗑️ Deleted ${minorsToDelete.length} minor(s) from customer ${id}`);
+      console.log(`🗑️ Deleted ${minorsToDelete.length} minor(s) from user ${id}`);
     }
 
-    // Update the existing waiver form (created during customer registration) with signature
-    // Find the most recent unsigned waiver for this customer
+    // Fetch updated minors for snapshot
+    const [currentMinors] = await db.query(
+      "SELECT first_name, last_name, dob FROM minors WHERE user_id = ? AND status = 1",
+      [id]
+    );
+
+    // Build snapshot data
+    const snapshotData = {
+      signer_name: `${user.first_name} ${user.last_name}`,
+      signer_email: user.email,
+      signer_address: user.address,
+      signer_city: user.city,
+      signer_province: user.province,
+      signer_postal: user.postal_code,
+      signer_dob: user.dob,
+      minors_snapshot: JSON.stringify(currentMinors)
+    };
+
+    // Update the existing waiver (created during user registration) with signature and snapshot
+    // Find the most recent unsigned waiver for this user
     const [existingWaivers] = await db.query(
-      "SELECT id FROM waiver_forms WHERE customer_id = ? AND signed_at IS NULL ORDER BY created_at DESC LIMIT 1",
+      "SELECT id FROM waivers WHERE user_id = ? AND signed_at IS NULL ORDER BY created_at DESC LIMIT 1",
       [id],
     );
 
     let waiverId;
     
     if (existingWaivers.length > 0) {
-      // Update existing waiver with signature
+      // Update existing waiver with signature and snapshot data
       waiverId = existingWaivers[0].id;
       await db.query(
-        "UPDATE waiver_forms SET signature_image = ?, signed_at = NOW() WHERE id = ?",
-        [signature, waiverId],
+        `UPDATE waivers 
+        SET signature_image = ?, signed_at = NOW(), 
+            signer_name = ?, signer_email = ?, signer_address = ?, 
+            signer_city = ?, signer_province = ?, signer_postal = ?, 
+            signer_dob = ?, minors_snapshot = ?
+        WHERE id = ?`,
+        [
+          signature, 
+          snapshotData.signer_name,
+          snapshotData.signer_email,
+          snapshotData.signer_address,
+          snapshotData.signer_city,
+          snapshotData.signer_province,
+          snapshotData.signer_postal,
+          snapshotData.signer_dob,
+          snapshotData.minors_snapshot,
+          waiverId
+        ],
       );
-      console.log(`✅ Updated waiver ${waiverId} with signature for customer ${id}`);
+      console.log(`✅ Updated waiver ${waiverId} with signature and snapshot for user ${id}`);
     } else {
       // Fallback: Create new waiver if none exists (shouldn't happen in normal flow)
       const [result] = await db.query(
-        "INSERT INTO waiver_forms (customer_id, signature_image, signed_at, completed) VALUES (?, ?, NOW(), 0)",
-        [id, signature],
+        `INSERT INTO waivers 
+        (user_id, signature_image, signed_at, completed, 
+         signer_name, signer_email, signer_address, 
+         signer_city, signer_province, signer_postal, 
+         signer_dob, minors_snapshot) 
+        VALUES (?, ?, NOW(), 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id, 
+          signature,
+          snapshotData.signer_name,
+          snapshotData.signer_email,
+          snapshotData.signer_address,
+          snapshotData.signer_city,
+          snapshotData.signer_province,
+          snapshotData.signer_postal,
+          snapshotData.signer_dob,
+          snapshotData.minors_snapshot
+        ],
       );
       waiverId = result.insertId;
-      console.log(`✅ Created new waiver ${waiverId} with signature for customer ${id}`);
+      console.log(`✅ Created new waiver ${waiverId} with signature and snapshot for user ${id}`);
     }
 
-    // Minors are already linked to customer via customer_id, no junction table needed
-    console.log(`✅ Signature saved for waiver ${waiverId}`);
+    console.log(`✅ Signature and snapshot saved for waiver ${waiverId}`);
 
     res.json({
       success: true,
@@ -525,7 +631,7 @@ const saveSignature = async (req, res) => {
     const errorId = `ERR_${Date.now()}`;
     console.error(`[${errorId}] Error saving signature:`, {
       message: error.message,
-      customerId: req.body.id,
+      userId: req.body.id,
     });
 
     res.status(500).json({
@@ -550,7 +656,7 @@ const acceptRules = async (req, res) => {
     }
 
     const [waivers] = await db.query(
-      "SELECT id FROM waiver_forms WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1",
+      "SELECT id FROM waivers WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
       [userId],
     );
 
@@ -561,12 +667,12 @@ const acceptRules = async (req, res) => {
     }
 
     await db.query(
-      "UPDATE waiver_forms SET rules_accepted = 1, completed = 1 WHERE id = ?",
+      "UPDATE waivers SET rules_accepted = 1, completed = 1 WHERE id = ?",
       [waivers[0].id],
     );
 
     // MAILCHIMP INTEGRATION - Auto-subscribe to mailing list
-    const [customers] = await db.query("SELECT * FROM customers WHERE id = ?", [
+    const [customers] = await db.query("SELECT * FROM users WHERE id = ?", [
       userId,
     ]);
     if (customers.length > 0) {
@@ -626,7 +732,7 @@ const getMinors = async (req, res) => {
 
     // Fetch complete customer data
     const [customers] = await db.query(
-      "SELECT * FROM customers WHERE cell_phone = ? ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM users WHERE cell_phone = ? ORDER BY created_at DESC LIMIT 1",
       [phone],
     );
 
@@ -641,7 +747,7 @@ const getMinors = async (req, res) => {
 
     // Fetch associated minors
     const [minors] = await db.query(
-      "SELECT * FROM minors WHERE customer_id = ?",
+      "SELECT * FROM minors WHERE user_id = ?",
       [customer.id],
     );
 
@@ -665,68 +771,78 @@ const getMinors = async (req, res) => {
 };
 
 /**
- * Gets all completed waivers with customer and minor information
- * Optimized to avoid N+1 query problem using LEFT JOIN and GROUP_CONCAT
+ * Gets all completed waivers with snapshot data for verification
+ * Uses snapshot data for historical accuracy (shows waiver as it was at signing)
  *
  * Index suggestions:
- * - CREATE INDEX idx_waiver_forms_completed ON waiver_forms(completed, created_at)
- * - CREATE INDEX idx_waiver_forms_user_id ON waiver_forms(user_id)
- * - CREATE INDEX idx_minors_customer_status ON minors(customer_id, status)
+ * - CREATE INDEX idx_waivers_completed ON waivers(completed, created_at)
  */
 const getAllCustomers = async (req, res) => {
   try {
-    // Optimized query to fetch all data in a single query using LEFT JOIN
-    // GROUP_CONCAT aggregates minors data to avoid N+1 query problem
+    // Fetch waivers with snapshot data (no joins with users/minors tables)
     // Filter out verified waivers (only show waivers that need verification)
     const [waivers] = await db.query(`
       SELECT 
-        c.id,
-        c.first_name,
-        c.last_name,
-        c.dob,
-        c.cell_phone as phone_number,
-        c.email,
-        c.address,
-        c.city,
-        c.province,
-        c.postal_code,
-        wf.id as waiver_id,
-        wf.signed_at,
-        wf.verified_by_staff,
-        wf.rating_email_sent,
-        wf.rating_sms_sent,
-        wf.completed,
-        GROUP_CONCAT(
-          CONCAT(m.first_name, '|', m.last_name) 
-          ORDER BY m.id 
-          SEPARATOR '@@'
-        ) as minors_data
-      FROM waiver_forms wf
-      JOIN customers c ON wf.customer_id = c.id
-      LEFT JOIN minors m ON m.customer_id = c.id AND m.status = 1
-      WHERE wf.completed = 1 AND (wf.verified_by_staff IS NULL OR wf.verified_by_staff = 0)
-      GROUP BY wf.id, c.id, c.first_name, c.last_name, c.dob, c.cell_phone, c.email, 
-               c.address, c.city, c.province, c.postal_code, wf.signed_at, 
-               wf.verified_by_staff, wf.rating_email_sent, wf.rating_sms_sent, wf.completed
-      ORDER BY wf.created_at DESC
+        w.user_id as id,
+        w.signer_name,
+        w.signer_email,
+        w.signer_address,
+        w.signer_city,
+        w.signer_province,
+        w.signer_postal,
+        w.signer_dob,
+        w.id as waiver_id,
+        w.signed_at,
+        w.verified_by_staff,
+        w.rating_email_sent,
+        w.rating_sms_sent,
+        w.completed,
+        w.minors_snapshot
+      FROM waivers w
+      WHERE w.completed = 1 AND (w.verified_by_staff IS NULL OR w.verified_by_staff = 0)
+      ORDER BY w.created_at DESC
     `);
 
-    // Parse minors data from GROUP_CONCAT result
+    // Parse snapshot data into expected format
     const result = waivers.map((waiver) => {
-      const minors = [];
-      if (waiver.minors_data) {
-        const minorEntries = waiver.minors_data.split("@@");
-        minorEntries.forEach((entry) => {
-          const [first_name, last_name] = entry.split("|");
-          if (first_name && last_name) {
-            minors.push({ first_name, last_name });
-          }
-        });
+      // Parse minors from snapshot JSON
+      let minors = [];
+      if (waiver.minors_snapshot) {
+        try {
+          const parsedMinors = JSON.parse(waiver.minors_snapshot);
+          minors = parsedMinors.map(m => ({
+            first_name: m.first_name,
+            last_name: m.last_name
+          }));
+        } catch (parseError) {
+          console.error(`Error parsing minors_snapshot for waiver ${waiver.waiver_id}:`, parseError);
+        }
       }
 
-      // Remove minors_data field and add parsed minors array
-      const { minors_data, ...waiverData } = waiver;
-      return { ...waiverData, minors };
+      // Extract first_name and last_name from signer_name
+      const nameParts = waiver.signer_name ? waiver.signer_name.split(' ') : ['', ''];
+      const first_name = nameParts[0] || '';
+      const last_name = nameParts.slice(1).join(' ') || '';
+
+      return {
+        id: waiver.id,
+        first_name,
+        last_name,
+        dob: waiver.signer_dob,
+        phone_number: null,
+        email: waiver.signer_email,
+        address: waiver.signer_address,
+        city: waiver.signer_city,
+        province: waiver.signer_province,
+        postal_code: waiver.signer_postal,
+        waiver_id: waiver.waiver_id,
+        signed_at: waiver.signed_at,
+        verified_by_staff: waiver.verified_by_staff,
+        rating_email_sent: waiver.rating_email_sent,
+        rating_sms_sent: waiver.rating_sms_sent,
+        completed: waiver.completed,
+        minors
+      };
     });
 
     res.json(result);
@@ -761,7 +877,7 @@ const verifyWaiver = async (req, res) => {
 
     // Check if waiver exists
     const [existingWaiver] = await db.query(
-      "SELECT id FROM waiver_forms WHERE id = ?",
+      "SELECT id FROM waivers WHERE id = ?",
       [id],
     );
 
@@ -772,7 +888,7 @@ const verifyWaiver = async (req, res) => {
     }
 
     await db.query(
-      "UPDATE waiver_forms SET verified_by_staff = ?, staff_id = ? WHERE id = ?",
+      "UPDATE waivers SET verified_by_staff = ?, staff_id = ? WHERE id = ?",
       [verified_by_staff, staff_id, id],
     );
 
@@ -796,7 +912,7 @@ const verifyWaiver = async (req, res) => {
 
 /**
  * Gets detailed information about a specific waiver
- * Includes customer and minor information
+ * Uses snapshot data for historical accuracy
  */
 const getWaiverDetails = async (req, res) => {
   try {
@@ -812,15 +928,21 @@ const getWaiverDetails = async (req, res) => {
     const [waivers] = await db.query(
       `
       SELECT 
-        c.*,
         wf.id as waiver_id,
         wf.signed_at,
         wf.signature_image,
         wf.rules_accepted,
         wf.verified_by_staff,
-        wf.customer_id
-      FROM waiver_forms wf
-      JOIN customers c ON wf.customer_id = c.id
+        wf.user_id,
+        wf.signer_name,
+        wf.signer_email,
+        wf.signer_address,
+        wf.signer_city,
+        wf.signer_province,
+        wf.signer_postal,
+        wf.signer_dob,
+        wf.minors_snapshot
+      FROM waivers wf
       WHERE wf.id = ?
     `,
       [id],
@@ -833,17 +955,19 @@ const getWaiverDetails = async (req, res) => {
     }
 
     const waiver = waivers[0];
-    const customerId = waiver.customer_id;
+    const customerId = waiver.user_id;
 
-    // Get minors for this customer
-    const [minors] = await db.query(
-      `SELECT m.* 
-       FROM minors m
-       WHERE m.customer_id = ? AND m.status = 1`,
-      [customerId],
-    );
+    // Parse minors from snapshot JSON instead of querying minors table
+    let minors = [];
+    if (waiver.minors_snapshot) {
+      try {
+        minors = JSON.parse(waiver.minors_snapshot);
+      } catch (parseError) {
+        console.error(`Error parsing minors_snapshot for waiver ${id}:`, parseError);
+      }
+    }
 
-    // Get waiver history for this customer with customer name and staff who verified
+    // Get waiver history for this customer with snapshot data and staff who verified
     const { convertToEST } = require("../utils/time");
     
     const [waiverHistoryRaw] = await db.query(
@@ -854,15 +978,14 @@ const getWaiverDetails = async (req, res) => {
         wf.signature_image,
         wf.verified_by_staff,
         wf.rules_accepted,
-        CONCAT(c.first_name, ' ', c.last_name) as name,
+        wf.signer_name as name,
         CASE 
           WHEN wf.verified_by_staff > 0 THEN CONCAT('Marked by ', s.name)
           ELSE 'Not verified'
         END as markedBy
-      FROM waiver_forms wf
-      JOIN customers c ON wf.customer_id = c.id
+      FROM waivers wf
       LEFT JOIN staff s ON wf.verified_by_staff = s.id
-      WHERE wf.customer_id = ?
+      WHERE wf.user_id = ?
       ORDER BY wf.signed_at DESC
     `,
       [customerId],
@@ -874,9 +997,28 @@ const getWaiverDetails = async (req, res) => {
       date: w.signed_at ? convertToEST(w.signed_at, "MMM DD, YYYY [at] hh:mm A") : null
     }));
 
+    // Build customer object from snapshot data to match expected frontend format
+    const customerData = {
+      id: customerId,
+      waiver_id: waiver.waiver_id,
+      first_name: waiver.signer_name ? waiver.signer_name.split(' ')[0] : '',
+      last_name: waiver.signer_name ? waiver.signer_name.split(' ').slice(1).join(' ') : '',
+      email: waiver.signer_email,
+      dob: waiver.signer_dob,
+      address: waiver.signer_address,
+      city: waiver.signer_city,
+      province: waiver.signer_province,
+      postal_code: waiver.signer_postal,
+      signed_at: waiver.signed_at,
+      signature_image: waiver.signature_image,
+      rules_accepted: waiver.rules_accepted,
+      verified_by_staff: waiver.verified_by_staff,
+      user_id: waiver.user_id
+    };
+
     // Return data in the format expected by the frontend
     res.json({
-      customer: waiver,
+      customer: customerData,
       minors: minors,
       waiverHistory: waiverHistory,
     });
@@ -896,7 +1038,7 @@ const getWaiverDetails = async (req, res) => {
 
 /**
  * Gets waiver history for a customer by phone number
- * Optimized to fetch minors only once instead of in a loop
+ * Uses snapshot data so each waiver shows historical info from when it was signed
  */
 const getUserHistory = async (req, res) => {
   try {
@@ -910,7 +1052,7 @@ const getUserHistory = async (req, res) => {
     }
 
     const [customers] = await db.query(
-      "SELECT id FROM customers WHERE cell_phone = ?",
+      "SELECT id FROM users WHERE cell_phone = ?",
       [phone],
     );
 
@@ -920,36 +1062,47 @@ const getUserHistory = async (req, res) => {
 
     const customerId = customers[0].id;
 
-    // Fetch waivers and minors in parallel for better performance
-    const [waiversResult, minorsResult] = await Promise.all([
-      db.query(
-        `
-        SELECT 
-          wf.id,
-          wf.signed_at,
-          wf.verified_by_staff,
-          wf.completed,
-          wf.created_at
-        FROM waiver_forms wf
-        WHERE wf.customer_id = ?
-        ORDER BY wf.created_at DESC
-      `,
-        [customerId],
-      ),
-      db.query(
-        "SELECT first_name, last_name FROM minors WHERE customer_id = ? AND status = 1",
-        [customerId],
-      ),
-    ]);
+    // Fetch waivers with snapshot data (no join with minors table)
+    const [waivers] = await db.query(
+      `
+      SELECT 
+        wf.id,
+        wf.signed_at,
+        wf.verified_by_staff,
+        wf.completed,
+        wf.created_at,
+        wf.minors_snapshot
+      FROM waivers wf
+      WHERE wf.user_id = ?
+      ORDER BY wf.created_at DESC
+    `,
+      [customerId],
+    );
 
-    const [waivers] = waiversResult;
-    const [minors] = minorsResult;
+    // Parse minors from snapshot for each waiver
+    const waiversWithMinors = waivers.map((waiver) => {
+      let minors = [];
+      if (waiver.minors_snapshot) {
+        try {
+          const parsedMinors = JSON.parse(waiver.minors_snapshot);
+          minors = parsedMinors.map(m => ({
+            first_name: m.first_name,
+            last_name: m.last_name
+          }));
+        } catch (parseError) {
+          console.error(`Error parsing minors_snapshot for waiver ${waiver.id}:`, parseError);
+        }
+      }
 
-    // Attach same minors list to all waivers (they belong to the customer)
-    const waiversWithMinors = waivers.map((waiver) => ({
-      ...waiver,
-      minors,
-    }));
+      return {
+        id: waiver.id,
+        signed_at: waiver.signed_at,
+        verified_by_staff: waiver.verified_by_staff,
+        completed: waiver.completed,
+        created_at: waiver.created_at,
+        minors
+      };
+    });
 
     res.json({ waivers: waiversWithMinors });
   } catch (error) {
@@ -968,7 +1121,7 @@ const getUserHistory = async (req, res) => {
 
 /**
  * Get all waivers with customer and minor details for admin history page
- * Returns formatted data with minors grouped by waiver
+ * Returns formatted data with minors from snapshot (historical data at time of signing)
  */
 const getAllWaivers = async (req, res) => {
   try {
@@ -976,38 +1129,53 @@ const getAllWaivers = async (req, res) => {
 
     const [rows] = await db.query(`
       SELECT 
-        c.id AS customer_id,
-        c.first_name, 
-        c.last_name, 
-        c.cell_phone, 
+        w.user_id,
+        w.signer_name,
+        w.signer_email,
         w.id AS waiver_id, 
         w.rating_email_sent,
         w.rating_sms_sent,
         w.signed_at, 
         w.verified_by_staff AS status,
-        GROUP_CONCAT(
-          CONCAT(m.first_name, '::', m.last_name) 
-          SEPARATOR '||'
-        ) AS minors
-      FROM customers c
-      JOIN waiver_forms w ON w.customer_id = c.id
-      LEFT JOIN minors m ON m.customer_id = c.id AND m.status = 1
-      GROUP BY w.id
+        w.minors_snapshot
+      FROM waivers w
       ORDER BY w.signed_at DESC
     `);
 
-    // Parse minors into array and format signed_at using backend timezone conversion
-    const waivers = rows.map(r => ({
-      ...r,
-      id: r.customer_id,
-      signed_at: r.signed_at ? convertToEST(r.signed_at, "MMM DD, YYYY [at] hh:mm A") : null,
-      minors: r.minors 
-        ? r.minors.split('||').map(n => {
-            const [first_name, last_name] = n.split('::');
-            return { first_name, last_name };
-          })
-        : []
-    }));
+    // Parse minors from snapshot JSON and format signed_at using backend timezone conversion
+    const waivers = rows.map(r => {
+      // Parse minors_snapshot JSON
+      let minors = [];
+      if (r.minors_snapshot) {
+        try {
+          const parsedMinors = JSON.parse(r.minors_snapshot);
+          minors = parsedMinors.map(m => ({
+            first_name: m.first_name,
+            last_name: m.last_name
+          }));
+        } catch (parseError) {
+          console.error(`Error parsing minors_snapshot for waiver ${r.waiver_id}:`, parseError);
+        }
+      }
+
+      // Extract first_name and last_name from signer_name
+      const nameParts = r.signer_name ? r.signer_name.split(' ') : ['', ''];
+      const first_name = nameParts[0] || '';
+      const last_name = nameParts.slice(1).join(' ') || '';
+
+      return {
+        id: r.user_id,
+        first_name,
+        last_name,
+        cell_phone: null,
+        waiver_id: r.waiver_id,
+        rating_email_sent: r.rating_email_sent,
+        rating_sms_sent: r.rating_sms_sent,
+        signed_at: r.signed_at ? convertToEST(r.signed_at, "MMM DD, YYYY [at] hh:mm A") : null,
+        status: r.status,
+        minors
+      };
+    });
 
     res.json(waivers);
   } catch (error) {
@@ -1035,7 +1203,7 @@ const deleteWaiver = async (req, res) => {
   }
 
   try {
-    const [result] = await db.query('DELETE FROM waiver_forms WHERE id = ?', [id]);
+    const [result] = await db.query('DELETE FROM waivers WHERE id = ?', [id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "Waiver not found" });
@@ -1070,7 +1238,7 @@ const updateWaiverStatus = async (req, res) => {
 
   try {
     const [result] = await db.query(
-      'UPDATE waiver_forms SET verified_by_staff = ? WHERE id = ?',
+      'UPDATE waivers SET verified_by_staff = ? WHERE id = ?',
       [status, id]
     );
 
@@ -1107,7 +1275,7 @@ const getRatingInfo = async (req, res) => {
     }
 
     const [customers] = await db.query(
-      'SELECT first_name, last_name FROM customers WHERE id = ?',
+      'SELECT first_name, last_name FROM users WHERE id = ?',
       [id]
     );
 
@@ -1207,7 +1375,7 @@ const getCustomerDashboard = async (req, res) => {
         c.cell_phone,
         c.status,
         c.created_at
-      FROM customers c
+      FROM users c
       WHERE c.cell_phone = ?
       ORDER BY c.created_at DESC`,
       [phone],
@@ -1239,7 +1407,7 @@ const getCustomerDashboard = async (req, res) => {
     const [waivers] = await db.query(
       `SELECT 
         wf.id as waiver_id,
-        wf.customer_id,
+        wf.user_id,
         wf.signed_at,
         wf.signature_image,
         wf.rules_accepted,
@@ -1250,9 +1418,9 @@ const getCustomerDashboard = async (req, res) => {
           WHEN wf.verified_by_staff > 0 THEN s.name
           ELSE NULL
         END as verified_by_name
-      FROM waiver_forms wf
+      FROM waivers wf
       LEFT JOIN staff s ON wf.verified_by_staff = s.id
-      WHERE wf.customer_id IN (?)
+      WHERE wf.user_id IN (?)
       ORDER BY wf.created_at DESC`,
       [customerIds],
     );
@@ -1265,23 +1433,23 @@ const getCustomerDashboard = async (req, res) => {
     if (customerIds.length > 0) {
       const [minorRecords] = await db.query(
         `SELECT 
-          m.customer_id,
+          m.user_id,
           m.id,
           m.first_name,
           m.last_name,
           m.dob,
           m.status
         FROM minors m
-        WHERE m.customer_id IN (?) AND m.status = 1`,
+        WHERE m.user_id IN (?) AND m.status = 1`,
         [customerIds],
       );
 
-      // Group minors by customer_id
+      // Group minors by user_id
       minorRecords.forEach(minor => {
-        if (!minorsByCustomerId[minor.customer_id]) {
-          minorsByCustomerId[minor.customer_id] = [];
+        if (!minorsByCustomerId[minor.user_id]) {
+          minorsByCustomerId[minor.user_id] = [];
         }
-        minorsByCustomerId[minor.customer_id].push({
+        minorsByCustomerId[minor.user_id].push({
           id: minor.id,
           first_name: minor.first_name,
           last_name: minor.last_name,
@@ -1291,15 +1459,15 @@ const getCustomerDashboard = async (req, res) => {
       });
     }
 
-    // Group waivers by customer_id and attach minors
+    // Group waivers by user_id and attach minors
     const waiversByCustomerId = {};
     waivers.forEach(waiver => {
-      if (!waiversByCustomerId[waiver.customer_id]) {
-        waiversByCustomerId[waiver.customer_id] = [];
+      if (!waiversByCustomerId[waiver.user_id]) {
+        waiversByCustomerId[waiver.user_id] = [];
       }
-      waiversByCustomerId[waiver.customer_id].push({
+      waiversByCustomerId[waiver.user_id].push({
         ...waiver,
-        minors: minorsByCustomerId[waiver.customer_id] || []
+        minors: minorsByCustomerId[waiver.user_id] || []
       });
     });
 
@@ -1345,7 +1513,7 @@ const getSignature = async (req, res) => {
 
     // Get the most recent waiver with a signature
     const [waivers] = await db.query(
-      "SELECT signature_image FROM waiver_forms WHERE customer_id = ? AND signature_image IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+      "SELECT signature_image FROM waivers WHERE user_id = ? AND signature_image IS NOT NULL ORDER BY created_at DESC LIMIT 1",
       [customerId],
     );
 
