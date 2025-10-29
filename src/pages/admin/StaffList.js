@@ -32,7 +32,9 @@ const StaffList = () => {
     try {
       setLoading(true);
       const response = await axios.get(`${BACKEND_URL}/api/staff/getstaff`);
-      const sortedData = response.data.sort((a, b) => b.id - a.id);
+      // Filter out superadmin users from the list
+      const filteredData = response.data.filter(s => s.role !== 'superadmin');
+      const sortedData = filteredData.sort((a, b) => b.id - a.id);
       setStaff(sortedData);
       setFiltered(sortedData);
     } catch (err) {
@@ -115,7 +117,11 @@ const StaffList = () => {
     },
     {
       name: "Role",
-      selector: row => row.role === 1 ? "Admin" : "Staff",
+      selector: row => {
+        if (row.role === 'superadmin') return 'Superadmin';
+        if (row.role === 'admin') return 'Admin';
+        return 'Staff';
+      },
       sortable: true
     },
     {
@@ -169,7 +175,7 @@ const StaffList = () => {
   const ExpandedComponent = ({ data }) => (
     <div style={{ padding: "10px 20px" }}>
       <div>
-        <strong>Role:</strong> {data.role === 1 ? "Admin" : "Staff"}
+        <strong>Role:</strong> {data.role === 'superadmin' ? 'Superadmin' : data.role === 'admin' ? 'Admin' : 'Staff'}
       </div>
       <div style={{ marginTop: "10px" }}>
         <strong>Status:</strong>{" "}

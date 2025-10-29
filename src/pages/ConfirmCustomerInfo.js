@@ -222,12 +222,11 @@ function ConfirmCustomerInfo() {
         })),
       };
 
-      if (!isReturning) {
-        await axios.post(
-          `${BACKEND_URL}/api/waivers/update-customer`,
-          updatedData,
-        );
-      }
+      // Always update customer data to save any changes made
+      await axios.post(
+        `${BACKEND_URL}/api/waivers/update-customer`,
+        updatedData,
+      );
 
       navigate("/signature", {
         replace: true,

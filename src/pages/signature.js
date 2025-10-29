@@ -350,8 +350,8 @@ function Signature() {
     try {
       await axios.post(`${BACKEND_URL}/api/waivers/save-signature`, payload);
  
-      // Clear localStorage after successful submission
-      localStorage.removeItem("signatureForm");
+      // Keep localStorage so data persists when going back from rules page
+      // It will be cleared on the AllDone page after final completion
       
       toast.success("Signature submitted sucessfully.");
       navigate("/rules", {
