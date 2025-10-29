@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { BACKEND_URL } from "../config";
+import UserHeader from "../components/UserHeader";
 
 function ConfirmCustomerInfo() {
   const location = useLocation();
@@ -335,37 +336,10 @@ function ConfirmCustomerInfo() {
   }
 
   return (
-    <div className="container-fluid">
-      <div className="container text-center">
-        <div className="row">
-          <div className="col-md-2">
-            <div className="back-btn">
-              <Link
-                to="/my-waivers"
-                state={{ phone }}
-              >
-                <img
-                  className="img-fluid"
-                  src="/assets/img/image 298.png"
-                  alt="back-icon"
-                />{" "}
-                BACK
-              </Link>
-            </div>
-          </div>
-          <div className="col-12 col-md-8 col-xl-8">
-            <div className="step-two step-three">
-              <div className="logo">
-                <img
-                  className="img-fluid"
-                  src="/assets/img/logo.png"
-                  alt="logo"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
+    <>
+      <UserHeader showBack={true} backTo="/my-waivers" backState={{ phone }} />
+      <div className="container-fluid">
+        <div className="container text-center">
         <div className="row">
           <div className="col-md-12 col-xl-10 mx-auto">
             <h3 className="h5-heading">
@@ -822,6 +796,7 @@ function ConfirmCustomerInfo() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

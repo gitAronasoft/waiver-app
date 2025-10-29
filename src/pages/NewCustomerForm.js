@@ -4,9 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useMask } from "@react-input/mask";
 import { countryCodes } from "../countryCodes";
-import { BACKEND_URL } from '../config';
-
-
+import { BACKEND_URL } from "../config";
 
 function NewCustomerForm() {
   const navigate = useNavigate();
@@ -50,7 +48,8 @@ function NewCustomerForm() {
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!validateEmail(formData.email)) {
-      newErrors.email = "Please enter a valid email address (e.g., name@example.com)";
+      newErrors.email =
+        "Please enter a valid email address (e.g., name@example.com)";
     }
 
     const phoneDigits = stripMask(formData.cell_phone);
@@ -79,18 +78,22 @@ function NewCustomerForm() {
     if (formData.signing_for_minor && minorList.length > 0) {
       minorList.forEach((minor, index) => {
         if (!minor.first_name.trim()) {
-          newErrors[`minor_${index}_first_name`] = `Minor ${index + 1} first name is required`;
+          newErrors[`minor_${index}_first_name`] =
+            `Minor ${index + 1} first name is required`;
         }
         if (!minor.last_name.trim()) {
-          newErrors[`minor_${index}_last_name`] = `Minor ${index + 1} last name is required`;
+          newErrors[`minor_${index}_last_name`] =
+            `Minor ${index + 1} last name is required`;
         }
         if (!minor.dob) {
-          newErrors[`minor_${index}_dob`] = `Minor ${index + 1} date of birth is required`;
+          newErrors[`minor_${index}_dob`] =
+            `Minor ${index + 1} date of birth is required`;
         } else {
           const minorDobDate = new Date(minor.dob);
           const today = new Date();
           if (minorDobDate > today) {
-            newErrors[`minor_${index}_dob`] = `Minor ${index + 1} date of birth cannot be in the future`;
+            newErrors[`minor_${index}_dob`] =
+              `Minor ${index + 1} date of birth cannot be in the future`;
           }
         }
       });
@@ -115,9 +118,10 @@ function NewCustomerForm() {
   };
 
   // Filter countries based on search
-  const filteredCountryCodes = countryCodes.filter((country) =>
-    country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
-    country.code.includes(countrySearch)
+  const filteredCountryCodes = countryCodes.filter(
+    (country) =>
+      country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+      country.code.includes(countrySearch),
   );
 
   // Handle click outside and Escape key
@@ -159,8 +163,8 @@ function NewCustomerForm() {
     email: "",
     signing_for_minor: false,
     minors: [],
-    country_code: "+1"
-  });  
+    country_code: "+1",
+  });
 
   const [minorList, setMinorList] = useState([]);
 
@@ -193,7 +197,8 @@ function NewCustomerForm() {
 
     if (!validateForm()) {
       const firstErrorKey = Object.keys(errors)[0];
-      const firstErrorMessage = errors[firstErrorKey] || "Please correct the errors in the form";
+      const firstErrorMessage =
+        errors[firstErrorKey] || "Please correct the errors in the form";
       toast.error(firstErrorMessage);
       return;
     }
@@ -235,11 +240,10 @@ function NewCustomerForm() {
     }
   };
 
-
   return (
     <div className="container-fluid">
       <div className="container text-center">
-        <div className="row">
+        <div className="row align-items-center">
           <div className="col-md-2">
             <div className="back-btn">
               <Link to="/">
@@ -282,9 +286,13 @@ function NewCustomerForm() {
                           name="first_name"
                           value={formData.first_name}
                           onChange={handleChange}
-                          className={`form-control ${errors.first_name ? 'is-invalid' : ''}`}
+                          className={`form-control ${errors.first_name ? "is-invalid" : ""}`}
                         />
-                        {errors.first_name && <small className="text-danger">{errors.first_name}</small>}
+                        {errors.first_name && (
+                          <small className="text-danger">
+                            {errors.first_name}
+                          </small>
+                        )}
                       </td>
                       <td>
                         Last Name:<span className="required-star">*</span>
@@ -294,9 +302,13 @@ function NewCustomerForm() {
                           name="last_name"
                           value={formData.last_name}
                           onChange={handleChange}
-                          className={`form-control ${errors.last_name ? 'is-invalid' : ''}`}
+                          className={`form-control ${errors.last_name ? "is-invalid" : ""}`}
                         />
-                        {errors.last_name && <small className="text-danger">{errors.last_name}</small>}
+                        {errors.last_name && (
+                          <small className="text-danger">
+                            {errors.last_name}
+                          </small>
+                        )}
                       </td>
                       <td>
                         DOB:<span className="required-star">*</span>
@@ -306,14 +318,16 @@ function NewCustomerForm() {
                           name="dob"
                           value={formData.dob}
                           onChange={handleChange}
-                          className={`form-control ${errors.dob ? 'is-invalid' : ''}`}
+                          className={`form-control ${errors.dob ? "is-invalid" : ""}`}
                         />
-                        {errors.dob && <small className="text-danger">{errors.dob}</small>}
+                        {errors.dob && (
+                          <small className="text-danger">{errors.dob}</small>
+                        )}
                       </td>
                     </tr>
 
                     <tr>
-                      <td >
+                      <td>
                         Address:<span className="required-star">*</span>
                         <br />
                         <input
@@ -321,9 +335,13 @@ function NewCustomerForm() {
                           name="address"
                           value={formData.address}
                           onChange={handleChange}
-                          className={`form-control ${errors.address ? 'is-invalid' : ''}`}
+                          className={`form-control ${errors.address ? "is-invalid" : ""}`}
                         />
-                        {errors.address && <small className="text-danger">{errors.address}</small>}
+                        {errors.address && (
+                          <small className="text-danger">
+                            {errors.address}
+                          </small>
+                        )}
                       </td>
                       <td>
                         City:<span className="required-star">*</span>
@@ -333,9 +351,11 @@ function NewCustomerForm() {
                           name="city"
                           value={formData.city}
                           onChange={handleChange}
-                          className={`form-control ${errors.city ? 'is-invalid' : ''}`}
+                          className={`form-control ${errors.city ? "is-invalid" : ""}`}
                         />
-                        {errors.city && <small className="text-danger">{errors.city}</small>}
+                        {errors.city && (
+                          <small className="text-danger">{errors.city}</small>
+                        )}
                       </td>
                       <td>
                         Province:<span className="required-star">*</span>
@@ -345,16 +365,18 @@ function NewCustomerForm() {
                           name="province"
                           value={formData.province}
                           onChange={handleChange}
-                          className={`form-control ${errors.province ? 'is-invalid' : ''}`}
+                          className={`form-control ${errors.province ? "is-invalid" : ""}`}
                         />
-                        {errors.province && <small className="text-danger">{errors.province}</small>}
+                        {errors.province && (
+                          <small className="text-danger">
+                            {errors.province}
+                          </small>
+                        )}
                       </td>
-                    
                     </tr>
 
                     <tr>
-
-                          <td>
+                      <td>
                         Postal Code:<span className="required-star">*</span>
                         <br />
                         <input
@@ -362,9 +384,13 @@ function NewCustomerForm() {
                           name="postal_code"
                           value={formData.postal_code}
                           onChange={handleChange}
-                          className={`form-control ${errors.postal_code ? 'is-invalid' : ''}`}
+                          className={`form-control ${errors.postal_code ? "is-invalid" : ""}`}
                         />
-                        {errors.postal_code && <small className="text-danger">{errors.postal_code}</small>}
+                        {errors.postal_code && (
+                          <small className="text-danger">
+                            {errors.postal_code}
+                          </small>
+                        )}
                       </td>
                       {/* <td>
                         Cell Phone:<span className="required-star">*</span>
@@ -384,11 +410,15 @@ function NewCustomerForm() {
                         Cell Phone:<span className="required-star">*</span>
                         <br />
                         <div className="phone-input-group">
-                          <div className="custom-dropdown" style={{ position: 'relative' }} ref={dropdownRef}>
+                          <div
+                            className="custom-dropdown"
+                            style={{ position: "relative" }}
+                            ref={dropdownRef}
+                          >
                             <div
                               className="form-select"
                               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                              style={{ cursor: 'pointer' }}
+                              style={{ cursor: "pointer" }}
                             >
                               {formData.country_code}
                             </div>
@@ -396,19 +426,29 @@ function NewCustomerForm() {
                               <div
                                 className="dropdown-menu show"
                                 style={{
-                                  position: 'absolute',                              
-                                  maxHeight: '250px',
-                                  overflowY: 'auto',
+                                  position: "absolute",
+                                  maxHeight: "250px",
+                                  overflowY: "auto",
                                   zIndex: 1000,
-                                  width: '300px'
+                                  width: "300px",
                                 }}
                               >
-                                <div style={{ position: 'sticky', top: 0, background: 'white', padding: '8px', borderBottom: '1px solid #ddd' }}>
+                                <div
+                                  style={{
+                                    position: "sticky",
+                                    top: 0,
+                                    background: "white",
+                                    padding: "8px",
+                                    borderBottom: "1px solid #ddd",
+                                  }}
+                                >
                                   <input
                                     type="text"
                                     placeholder="Search country or code..."
                                     value={countrySearch}
-                                    onChange={(e) => setCountrySearch(e.target.value)}
+                                    onChange={(e) =>
+                                      setCountrySearch(e.target.value)
+                                    }
                                     className="form-control form-control-sm"
                                     onClick={(e) => e.stopPropagation()}
                                     autoFocus
@@ -419,14 +459,19 @@ function NewCustomerForm() {
                                     <div
                                       key={index}
                                       className="dropdown-item"
-                                      onClick={() => handleCountrySelect(c.code)}
-                                      style={{ cursor: 'pointer' }}
+                                      onClick={() =>
+                                        handleCountrySelect(c.code)
+                                      }
+                                      style={{ cursor: "pointer" }}
                                     >
                                       {c.code} - {c.name}
                                     </div>
                                   ))
                                 ) : (
-                                  <div className="dropdown-item" style={{ color: '#999' }}>
+                                  <div
+                                    className="dropdown-item"
+                                    style={{ color: "#999" }}
+                                  >
                                     No countries found
                                   </div>
                                 )}
@@ -440,13 +485,17 @@ function NewCustomerForm() {
                             name="cell_phone"
                             value={formData.cell_phone}
                             onChange={handleChange}
-                            className={`form-control ${errors.cell_phone ? 'is-invalid' : ''}`}
+                            className={`form-control ${errors.cell_phone ? "is-invalid" : ""}`}
                           />
                         </div>
-                        {errors.cell_phone && <small className="text-danger">{errors.cell_phone}</small>}
+                        {errors.cell_phone && (
+                          <small className="text-danger">
+                            {errors.cell_phone}
+                          </small>
+                        )}
                       </td>
 
-                      <td >
+                      <td>
                         Email:<span className="required-star">*</span>
                         <br />
                         <input
@@ -454,9 +503,11 @@ function NewCustomerForm() {
                           name="email"
                           value={formData.email}
                           onChange={handleChange}
-                          className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                          className={`form-control ${errors.email ? "is-invalid" : ""}`}
                         />
-                        {errors.email && <small className="text-danger">{errors.email}</small>}
+                        {errors.email && (
+                          <small className="text-danger">{errors.email}</small>
+                        )}
                       </td>
                     </tr>
                   </tbody>
@@ -479,7 +530,11 @@ function NewCustomerForm() {
                           ]);
                         }
                       }}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                      style={{
+                        width: "20px",
+                        height: "20px",
+                        cursor: "pointer",
+                      }}
                     />{" "}
                     <span className="ms-2">Yes</span>
                   </label>
@@ -495,7 +550,11 @@ function NewCustomerForm() {
                         }));
                         setMinorList([]);
                       }}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                      style={{
+                        width: "20px",
+                        height: "20px",
+                        cursor: "pointer",
+                      }}
                     />{" "}
                     <span className="ms-2">No</span>
                   </label>
@@ -510,60 +569,74 @@ function NewCustomerForm() {
                         <div className="col-12 col-md-3">
                           <input
                             type="text"
-                            className={`form-control ${errors[`minor_${index}_first_name`] ? 'is-invalid' : ''}`}
+                            className={`form-control ${errors[`minor_${index}_first_name`] ? "is-invalid" : ""}`}
                             placeholder="First Name"
                             value={minor.first_name}
                             onChange={(e) =>
-                              handleMinorChange(index, "first_name", e.target.value)
+                              handleMinorChange(
+                                index,
+                                "first_name",
+                                e.target.value,
+                              )
                             }
                             style={{
-                              backgroundColor: '#e9ecef',
-                              border: 'none',
-                              borderRadius: '8px',
-                              padding: '12px 15px'
+                              backgroundColor: "#e9ecef",
+                              border: "none",
+                              borderRadius: "8px",
+                              padding: "12px 15px",
                             }}
                           />
                           {errors[`minor_${index}_first_name`] && (
-                            <small className="text-danger d-block mt-1">{errors[`minor_${index}_first_name`]}</small>
+                            <small className="text-danger d-block mt-1">
+                              {errors[`minor_${index}_first_name`]}
+                            </small>
                           )}
                         </div>
                         <div className="col-12 col-md-3">
                           <input
                             type="text"
-                            className={`form-control ${errors[`minor_${index}_last_name`] ? 'is-invalid' : ''}`}
+                            className={`form-control ${errors[`minor_${index}_last_name`] ? "is-invalid" : ""}`}
                             placeholder="Last Name"
                             value={minor.last_name}
                             onChange={(e) =>
-                              handleMinorChange(index, "last_name", e.target.value)
+                              handleMinorChange(
+                                index,
+                                "last_name",
+                                e.target.value,
+                              )
                             }
                             style={{
-                              backgroundColor: '#e9ecef',
-                              border: 'none',
-                              borderRadius: '8px',
-                              padding: '12px 15px'
+                              backgroundColor: "#e9ecef",
+                              border: "none",
+                              borderRadius: "8px",
+                              padding: "12px 15px",
                             }}
                           />
                           {errors[`minor_${index}_last_name`] && (
-                            <small className="text-danger d-block mt-1">{errors[`minor_${index}_last_name`]}</small>
+                            <small className="text-danger d-block mt-1">
+                              {errors[`minor_${index}_last_name`]}
+                            </small>
                           )}
                         </div>
                         <div className="col-12 col-md-3">
                           <input
                             type="date"
-                            className={`form-control ${errors[`minor_${index}_dob`] ? 'is-invalid' : ''}`}
+                            className={`form-control ${errors[`minor_${index}_dob`] ? "is-invalid" : ""}`}
                             value={minor.dob}
                             onChange={(e) =>
                               handleMinorChange(index, "dob", e.target.value)
                             }
                             style={{
-                              backgroundColor: '#e9ecef',
-                              border: 'none',
-                              borderRadius: '8px',
-                              padding: '12px 15px'
+                              backgroundColor: "#e9ecef",
+                              border: "none",
+                              borderRadius: "8px",
+                              padding: "12px 15px",
                             }}
                           />
                           {errors[`minor_${index}_dob`] && (
-                            <small className="text-danger d-block mt-1">{errors[`minor_${index}_dob`]}</small>
+                            <small className="text-danger d-block mt-1">
+                              {errors[`minor_${index}_dob`]}
+                            </small>
                           )}
                         </div>
                         <div className="col-12 col-md-3">
@@ -572,12 +645,12 @@ function NewCustomerForm() {
                             className="btn w-100"
                             onClick={() => removeMinor(index)}
                             style={{
-                              backgroundColor: '#8F9090',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              padding: '12px 15px',
-                              fontWeight: '500'
+                              backgroundColor: "#8F9090",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "8px",
+                              padding: "12px 15px",
+                              fontWeight: "500",
                             }}
                           >
                             Remove
@@ -592,13 +665,13 @@ function NewCustomerForm() {
                       onClick={addMinor}
                       className="btn"
                       style={{
-                        backgroundColor: '#007bff',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '12px 40px',
-                        fontWeight: '500',
-                        fontSize: '16px'
+                        backgroundColor: "#007bff",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "8px",
+                        padding: "12px 40px",
+                        fontWeight: "500",
+                        fontSize: "16px",
                       }}
                     >
                       Add another minor

@@ -162,15 +162,15 @@ a {
 }
 
 .back-btn {
-  margin-top: 50px;
-  font-weight: 600;
+  font-weight: 400;
   display: flex;
   align-items: center;
   gap: 6px;
+  color: var(--black);
 }
 
 .back-btn img {
-  width: 15%;
+  width: 25%;
 }
 
 .back-btn a img {

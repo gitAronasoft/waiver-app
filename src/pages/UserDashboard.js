@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { BACKEND_URL } from '../config';
+import UserHeader from '../components/UserHeader';
 
 function UserDashboard() {
   const location = useLocation();
@@ -97,17 +98,9 @@ function UserDashboard() {
           font-weight: 600;
         }
       `}</style>
+      <UserHeader />
       <div className="container-fluid" style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
         <div className="container py-3">
-          {/* Header Section with Logo */}
-          <div className="row">
-            <div className="col-12">
-              <div className="logo text-center">
-                <img className="img-fluid" src="/assets/img/logo.png" alt="logo" />
-              </div>
-            </div>
-          </div>
-
         {/* Title Section */}
         <div className="row mb-3">
           <div className="col-12 text-center">

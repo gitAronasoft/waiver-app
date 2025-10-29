@@ -4,6 +4,7 @@ import SignaturePad from "react-signature-canvas";
 import axios from "axios";
 import { toast } from 'react-toastify';
 import { BACKEND_URL } from '../config';
+import UserHeader from '../components/UserHeader';
 
 
 
@@ -413,57 +414,37 @@ function formatPhone(phone = "") {
     );
   }
 
+  const handleBackClick = () => {
+    // Clear localStorage when going back
+    localStorage.removeItem("signatureForm");
+    
+    if (customerType === "new") {
+      navigate("/verify-otp", { state: { phone, customerType } });
+    } else {
+      navigate("/confirm-info", { 
+        state: { 
+          phone, 
+          customerType,
+          customerId,
+          isReturning,
+          waiverId // Preserve waiverId when going back
+        } 
+      });
+    }
+  };
+
   return (
-    <div className="container-fluid">
-      <div className="container">
-        <div className="row">
-          <div className="col-md-2">
-            {/* <div className="back-btn">
-              <a href="/existing-customer">
-                <img src="/assets/img/image 298.png" className="img-fluid" alt="back" /> BACK
-              </a>
-            </div> */}
-                      <div className="back-btn no-print" style={{ cursor: "pointer" }} onClick={() => {
-                        // Clear localStorage when going back
-                        localStorage.removeItem("signatureForm");
-                        
-                        if (customerType === "new") {
-                          navigate("/verify-otp", { state: { phone, customerType } });
-                        } else {
-                          navigate("/confirm-info", { 
-                            state: { 
-                              phone, 
-                              customerType,
-                              customerId,
-                              isReturning,
-                              waiverId // Preserve waiverId when going back
-                            } 
-                          });
-                        }
-                      }}>
-                         
-                        <img src="/assets/img/image 298.png" className="img-fluid" alt="back" /> BACK
-                       
-                      </div>
-          </div>
-
-
-
-          <div className="col-12 col-md-8 col-xl-8">
-            <div className="step-two step-three">
-              <div className="logo">
-                <img
-                  src="/assets/img/logo.png"
-                  className="img-fluid"
-                  alt="logo"
-                />
-              </div>
+    <>
+      <UserHeader showBack={true} onBack={handleBackClick} />
+      <div className="container-fluid">
+        <div className="container">
+          <div className="row">
+            <div className="col-12">
               <h5 className="h5-heading my-3 mt-3 text-center">
-               Assumption of Risk, Release and Indemnification 
+                Assumption of Risk, Release and Indemnification 
               </h5>
             </div>
           </div>
-        </div>
         
       <div class="row"> 
 
@@ -777,6 +758,7 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
         </div>
       </div>
     </div>
+    </>
   );
 }
 

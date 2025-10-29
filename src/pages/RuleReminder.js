@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { BACKEND_URL } from "../config";
+import UserHeader from "../components/UserHeader";
 
 function RuleReminder() {
   const navigate = useNavigate();
@@ -36,44 +37,19 @@ function RuleReminder() {
   };
 
   return (
-    <div className="container-fluid">
-      <div className="container text-center">
-        {/* Header Section - Back button and logo in same row on all devices */}
-        <div className="row">
-          <div className="col-md-2 ">
-            <div
-              className="back-btn"
-              style={{ cursor: "pointer" }}
-              onClick={() =>
-                navigate("/signature", {
-                  state: { phone, customerType, userId },
-                })
-              }
-            >
-              <img
-                className="img-fluid"
-                src="/assets/img/image 298.png"
-                alt="back-icon"
-              />{" "}
-              BACK
+    <>
+      <UserHeader 
+        showBack={true} 
+        backTo="/signature" 
+        backState={{ phone, customerType, userId }}
+      />
+      <div className="container-fluid">
+        <div className="container text-center">
+          <div className="row">
+            <div className="col-12">
+              <h5 className="h5-headingcccc">Rule Reminder</h5>
             </div>
           </div>
-
-          <div className="col-12 col-md-8 col-xl-8">
-            <div className="step-two step-three">
-              <div className="logo">
-                <img
-                  className="img-fluid"
-                  src="/assets/img/logo.png"
-                  alt="logo"
-                />
-              </div>
-              <div>
-                <h5 className="h5-headingcccc">Rule Reminder</h5>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Main Content Section */}
         <div className="row mt-4">
@@ -164,6 +140,7 @@ function RuleReminder() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

@@ -128,7 +128,7 @@ function ExistingCustomerLogin() {
       <div className="container text-center">
         <div className="row">
           <div className="col-md-2">
-            <div className="back-btn">
+            <div className="back-btn" style={{ 'margin-top': '70px'}}>
               <Link to="/">
                 <img
                   className="img-fluid"

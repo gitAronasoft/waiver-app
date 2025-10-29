@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import Confetti from "react-confetti"; // Install: npm install react-confetti
+import Confetti from "react-confetti";
+import UserHeader from "../components/UserHeader";
 
 
 function AllDone() {
@@ -57,25 +58,20 @@ function AllDone() {
 
 
   return (
-    <div className="container-fluid text-center" style={{ position: "relative" }}>
-      {/* 🎉 Confetti Animation */}
-      <Confetti
-        width={window.innerWidth}
-        height={window.innerHeight}
-        numberOfPieces={300}
-        gravity={0.2}
-      />
+    <>
+      <UserHeader />
+      <div className="container-fluid text-center" style={{ position: "relative" }}>
+        {/* 🎉 Confetti Animation */}
+        <Confetti
+          width={window.innerWidth}
+          height={window.innerHeight}
+          numberOfPieces={300}
+          gravity={0.2}
+        />
 
-      <div className="container">
-        <div className="row">
-          <div className="col-12 col-md-12 col-xl-8 mx-auto">
-            <div className="logo-img my-4">
-              <img
-                className="img-fluid"
-                src="/assets/img/logo.png"
-                alt="logo"
-              />
-            </div>
+        <div className="container">
+          <div className="row">
+            <div className="col-12 col-md-12 col-xl-8 mx-auto">
 
             <h3 className="my-4 h5-heading h3-heading" style={{ fontSize: "2rem", fontWeight: "bold" }}>
               🎉 YAY!!! ALL DONE 🎉 <br />
@@ -98,6 +94,7 @@ function AllDone() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
