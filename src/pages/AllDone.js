@@ -13,7 +13,9 @@ function AllDone() {
   const phone = useSelector((state) => state.waiverSession.phone);
   const flowType = useSelector((state) => state.waiverSession.flowType);
   const currentStep = useSelector((state) => state.waiverSession.progress.currentStep);
-  const skipToMyWaivers = flowType === "existing";
+  const customerId = useSelector((state) => state.waiverSession.customerId);
+  // Redirect to My Waivers if user has a customerId (both new and existing customers after signing)
+  const skipToMyWaivers = Boolean(customerId);
 
   const handleReturn = () => {
     dispatch(clearWaiverSession());
@@ -41,9 +43,8 @@ function AllDone() {
           
           dispatch(clearWaiverSession());
           
-          if (flowType === "existing" && phone) {
-            navigate("/my-waivers", { replace: true });
-          } else if (skipToMyWaivers && phone) {
+          // If user has customerId and phone, they should see their waivers
+          if (customerId && phone) {
             navigate("/my-waivers", { replace: true });
           } else {
             navigate("/", { replace: true });

@@ -162,7 +162,7 @@ function UserDashboard() {
                               key={waiver.waiver_id} 
                               onClick={() => {
                                 dispatch(setWaiverId(waiver.waiver_id));
-                                dispatch(setViewMode(false));
+                                dispatch(setViewMode(true));
                                 navigate("/confirm-info", { 
                                   state: { 
                                     phone, 

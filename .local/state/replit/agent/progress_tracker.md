@@ -3,6 +3,199 @@
 [x] 3. Verify the project is working using the feedback tool
 [x] 4. Inform user the import is completed and they can start building, mark the import as completed using the complete_project_import tool
 
+## Session 36 (October 30, 2025) - Fixed Existing Customer Waiver Viewing Flow:
+
+[x] 339. Fixed UserDashboard to set viewMode(true) when clicking a waiver (line 168)
+[x] 340. Added setViewMode import to ConfirmCustomerInfo (line 11)
+[x] 341. Updated proceedToSignature to set viewMode(false) when creating new waiver with modifications (line 352)
+[x] 342. Updated signature page handleBackClick to navigate to /my-waivers when in viewMode (line 352-355)
+[x] 343. Restarted React App workflow - Successfully compiled with minor ESLint warnings
+[x] 344. Updated progress tracker with Session 36 information
+
+### Session 36 Bug Fixed:
+
+**Bug: Existing Customer Waiver Viewing Flow Not Working Correctly** ✅
+
+**User Requirements:**
+- When user clicks a waiver from "My Waivers", should load that waiver on confirm-info page
+- **If NO modifications made**: Continue to signature page with prefilled data → click Continue → accept rules → redirect to My Waivers (NOT logout)
+- **If modifications made**: Prompt user to confirm → create new waiver → user signs → accept rules → redirect to My Waivers
+
+**Problem Identified:**
+1. **UserDashboard Bug**: Was setting `viewMode(false)` when clicking a waiver, should be `viewMode(true)` to indicate viewing mode
+2. **ConfirmCustomerInfo Bug**: When user confirmed modifications to create new waiver, `viewMode` was not being set to `false`
+3. **Signature Page Bug**: Back button always went to confirm-info, should go to /my-waivers when in viewMode
+4. **Flow Issue**: The viewMode flag controls whether to submit the signature or just navigate through the flow
+
+**Root Cause:**
+- UserDashboard was setting viewMode to false, causing the signature page to always submit the waiver instead of just viewing
+- When modifications were confirmed, viewMode wasn't updated to false to signal a new waiver needs signing
+- Back navigation didn't respect the viewMode flag
+
+**Solution Implemented:**
+
+**1. UserDashboard.js Fix (line 168):**
+- Changed `dispatch(setViewMode(false))` to `dispatch(setViewMode(true))`
+- Now correctly indicates the user is viewing an existing waiver
+- This allows the flow to check for modifications and handle accordingly
+
+**2. ConfirmCustomerInfo.js Fixes:**
+- **Line 11**: Added `setViewMode` to imports from waiverSessionSlice
+- **Line 352**: Added `dispatch(setViewMode(false))` when creating new waiver after modifications detected
+- This signals that the new waiver needs to be signed (not just viewed)
+
+**3. Signature.js Fix (line 352-355):**
+- Updated `handleBackClick()` to check viewMode first
+- If `viewMode` is true, navigate to `/my-waivers` instead of `/confirm-info`
+- Provides proper back navigation for users viewing waivers
+
+**Data Flow After Fix:**
+
+**No Modifications Flow:**
+1. UserDashboard → click waiver → `setViewMode(true)`, `setWaiverId(waiverId)`
+2. ConfirmCustomerInfo → loads waiver snapshot → user makes NO changes
+3. Click "Confirm" → `hasModifications()` returns false → keeps `viewMode: true`
+4. Navigate to /signature with `viewMode: true`
+5. Signature page → loads prefilled signature → button shows "Continue"
+6. Click Continue → `if (viewMode)` check (line 193) → navigate to /rules WITHOUT submitting
+7. RuleReminder → click Confirm → navigate to /all-done
+8. AllDone → `flowType === "existing"` → redirect to /my-waivers ✅
+9. User stays logged in and sees their waiver list ✅
+
+**With Modifications Flow:**
+1. UserDashboard → click waiver → `setViewMode(true)`, `setWaiverId(waiverId)`
+2. ConfirmCustomerInfo → loads waiver snapshot → user adds/removes minor or changes data
+3. Click "Confirm" → `hasModifications()` returns true → show confirmation dialog
+4. User clicks "Yes, Continue" → `proceedToSignature()` is called
+5. Create new waiver via API → `setWaiverId(null)` → `setViewMode(false)` ✅
+6. Navigate to /signature with `viewMode: false`
+7. Signature page → loads form → user signs → button shows "Accept and continue"
+8. Click submit → signature is saved → new waiver created → navigate to /rules
+9. RuleReminder → click Confirm → navigate to /all-done
+10. AllDone → `flowType === "existing"` → redirect to /my-waivers ✅
+11. User stays logged in and sees their NEW waiver in the list ✅
+
+**Benefits:**
+- Correct viewMode state management for existing customer flows
+- No modifications = viewing only, no new waiver created
+- With modifications = new waiver created and signed
+- User stays logged in and returns to My Waivers after both flows
+- Back button navigation respects the flow context
+- Preserves historical waiver integrity while allowing new waiver creation
+
+**Files Modified:**
+1. `src/pages/UserDashboard.js` - Changed setViewMode(false) to setViewMode(true) (line 168)
+2. `src/pages/ConfirmCustomerInfo.js` - Added setViewMode import and dispatch when creating new waiver (lines 11, 352)
+3. `src/pages/signature.js` - Updated handleBackClick to navigate to /my-waivers when viewMode is true (lines 352-355)
+
+**All 344 tasks marked as complete [x]**
+
+---
+
+## Session 35 (October 30, 2025) - Fixed Existing Customer View/Modify Waiver Flow:
+
+[x] 332. Installed backend dependencies (express, bcrypt, cors, etc.) - 212 packages
+[x] 333. Installed frontend dependencies (react, react-scripts, axios, etc.) - 1423 packages
+[x] 334. Restarted Backend API workflow - Successfully running on port 8080
+[x] 335. Restarted React App workflow - Successfully compiled and running on port 5000
+[x] 336. Verified application with screenshot - Welcome page displaying correctly
+[x] 337. Fixed UserDashboard to set viewMode(true) when clicking a waiver
+[x] 338. Fixed ConfirmCustomerInfo to set viewMode(false) when creating new waiver after modifications
+[x] 339. Updated signature page back button to navigate to /my-waivers when in viewMode
+[x] 340. Restarted React App workflow - Successfully compiled
+[x] 341. Updated progress tracker with Session 35 information
+
+### Session 35 Bug Fixed:
+
+**Bug: Existing Customer Waiver View/Modify Flow Not Working Correctly** ✅
+
+**User Requirements:**
+- When existing customer selects a waiver from "My Waivers", show the waiver data on confirm-info page
+- If user makes NO modifications, allow them to view signature page and click back button to return to My Waivers (no new waiver created)
+- If user makes modifications (add/remove minors, check/uncheck), prompt confirmation and create NEW waiver
+- After signing new waiver and accepting rules, redirect to My Waivers page (NOT logout)
+- Entire flow should keep user logged in
+
+**Problem Identified:**
+1. **UserDashboard Issue**: Was setting `viewMode(false)` instead of `viewMode(true)` when clicking a waiver
+2. **ConfirmCustomerInfo Issue**: When modifications detected and new waiver created, wasn't setting `viewMode(false)` 
+3. **Signature Page Issue**: Back button wasn't checking viewMode, always went to confirm-info instead of my-waivers
+4. **AllDone Page**: Already correctly redirects to /my-waivers for existing customers (flowType === 'existing')
+
+**Root Cause:**
+- The modification detection logic (hasModifications) was correctly implemented in Session 31
+- However, the viewMode flag management was incorrect:
+  - UserDashboard was setting viewMode=false when user clicks to VIEW a waiver
+  - This caused the signature page to think it was a new waiver submission
+  - The back button logic didn't account for viewMode navigation
+
+**Solution Implemented:**
+
+**1. UserDashboard.js (Line 168):**
+- Changed `dispatch(setViewMode(false))` to `dispatch(setViewMode(true))`
+- Now correctly sets viewMode=true when user clicks to view their waiver
+- This allows the flow to distinguish between viewing and creating new
+
+**2. ConfirmCustomerInfo.js:**
+- **Line 11**: Added `setViewMode` import from Redux slice
+- **Line 352**: Added `dispatch(setViewMode(false))` after creating new waiver
+- When modifications are detected and confirmed, new waiver is created
+- Sets viewMode=false so signature page knows to submit (not just view)
+- Ensures proper state management throughout the flow
+
+**3. Signature.js (Lines 347-355):**
+- Updated `handleBackClick()` function to check viewMode first
+- If viewMode=true, navigates to `/my-waivers` instead of `/confirm-info`
+- Allows users viewing waivers to go back to their waiver list
+- Preserves existing back button behavior for new waiver creation
+
+**Data Flow After Fix:**
+
+**Scenario 1: View Waiver WITHOUT Modifications**
+1. My Waivers → Click waiver → UserDashboard sets (waiverId, viewMode=true)
+2. ConfirmCustomerInfo loads waiver snapshot data
+3. User reviews, no changes → Click Confirm
+4. hasModifications() returns false
+5. Navigate to /signature with viewMode=true
+6. Signature page loads with prefilled data
+7. Back button → Navigate to /my-waivers ✅
+8. Continue button (no signature required) → Navigate to /rules
+9. Rules page → Accept rules → Navigate to /all-done
+10. AllDone → Auto-redirect to /my-waivers (flowType='existing') ✅
+11. User stays logged in ✅
+
+**Scenario 2: Modify Waiver to Create NEW Waiver**
+1. My Waivers → Click waiver → UserDashboard sets (waiverId, viewMode=true)
+2. ConfirmCustomerInfo loads waiver snapshot data
+3. User adds new minor or unchecks existing minor
+4. Click Confirm → hasModifications() returns true
+5. Show confirmation dialog: "You have made changes..."
+6. Click "Yes, Continue" → Create new unsigned waiver
+7. Set viewMode=false, waiverId=null ✅
+8. Navigate to /signature with viewMode=false
+9. Signature page requires new signature (no prefill for NEW waiver)
+10. User signs → Submit → Navigate to /rules
+11. Rules page → Accept rules → Navigate to /all-done
+12. AllDone → Auto-redirect to /my-waivers (flowType='existing') ✅
+13. User stays logged in, sees new waiver in list ✅
+
+**Benefits:**
+- Correct viewMode flag management throughout the flow
+- Back button navigation respects view vs create context
+- Users can view historical waivers without creating new ones
+- Clear confirmation dialog when modifications trigger new waiver creation
+- Existing customers stay logged in after completing any flow
+- Seamless UX for both viewing and creating new waivers
+
+**Files Modified:**
+1. `src/pages/UserDashboard.js` - Set viewMode(true) when clicking waiver (line 168)
+2. `src/pages/ConfirmCustomerInfo.js` - Added setViewMode import and dispatch (lines 11, 352)
+3. `src/pages/signature.js` - Updated back button to check viewMode (lines 347-355)
+
+**All 341 tasks marked as complete [x]**
+
+---
+
 ## Session 34 (October 30, 2025) - Fixed Confirm Info Page Showing Wrong Waiver Data:
 
 [x] 324. Analyzed confirm-info page data flow for new and existing customer flows

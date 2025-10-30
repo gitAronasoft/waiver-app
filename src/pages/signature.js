@@ -47,7 +47,7 @@ function Signature() {
   const [form, setForm] = useState({
     date: "",
     fullName: "",
-    consented: isReturning,
+    consented: customerType === "existing" || isReturning,
     subscribed: false,
     minors: [],
   });
@@ -183,16 +183,9 @@ function Signature() {
   };
 
   const handleSubmit = async () => {
-    // If viewing a completed waiver, redirect directly to My Waivers
-    if (viewCompleted) {
+    // If in view mode (viewing existing waiver) AND NOT creating a new waiver, redirect directly to My Waivers
+    if ((viewMode || viewCompleted) && !createNewWaiver) {
       navigate("/my-waivers", { replace: true });
-      return;
-    }
-
-    // If in view mode, just navigate to rules without submitting
-    if (viewMode) {
-      dispatch(setCurrentStep('RULE_REMINDER'));
-      navigate("/rules", { replace: true });
       return;
     }
 
@@ -209,7 +202,7 @@ function Signature() {
       return;
     }
 
-    if (sigPadRef.current.isEmpty()) {
+    if (!sigPadRef.current || sigPadRef.current.isEmpty()) {
       toast.error("Please provide your signature before continuing.");
       setSubmitting(false);
       return;
@@ -275,46 +268,59 @@ function Signature() {
     const updatedForm = { ...form, minors: cleanedMinors };
     setForm(updatedForm);
 
-    //const signatureData = sigPadRef.current.getCanvas().toDataURL("image/png");
-    // const signatureData = sigPadRef.current.getCanvas().toDataURL("image/jpeg", 0.6); // ✅ Compress signature
-
-       // ✅ Add white background before exporting
-    const canvas = sigPadRef.current.getCanvas();
-    const ctx = canvas.getContext("2d");
-    ctx.globalCompositeOperation = "destination-over";
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    const signatureData = canvas.toDataURL("image/jpeg", 0.6); // compressed JPEG with white background
-
-    setSignatureImage(signatureData);
-    dispatch(setSignatureImageRedux(signatureData));
-
-    const payload = {
-      id: customerData?.id,
-      phone,
-      date: updatedForm.date,
-      fullName: updatedForm.fullName,
-      minors: cleanedMinors,
-      subscribed: updatedForm.subscribed,
-      consented: updatedForm.consented,
-      signature: signatureData,
-    };
-
     try {
-      await axios.post(`${BACKEND_URL}/api/waivers/save-signature`, payload);
+      // Add white background before exporting
+      const canvas = sigPadRef.current.getCanvas();
+      const ctx = canvas.getContext("2d");
+      
+      // Save current composition operation
+      const currentCompositeOperation = ctx.globalCompositeOperation;
+      
+      // Draw white background
+      ctx.globalCompositeOperation = "destination-over";
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Get signature data as compressed JPEG
+      const signatureData = canvas.toDataURL("image/jpeg", 0.6);
+      
+      // Restore original composition operation
+      ctx.globalCompositeOperation = currentCompositeOperation;
+
+      setSignatureImage(signatureData);
+      dispatch(setSignatureImageRedux(signatureData));
+
+      const payload = {
+        id: customerData?.id || customerId,
+        phone,
+        date: updatedForm.date,
+        fullName: updatedForm.fullName,
+        minors: cleanedMinors,
+        subscribed: updatedForm.subscribed,
+        consented: updatedForm.consented,
+        signature: signatureData,
+      };
+
+      console.log("Submitting signature payload:", { ...payload, signature: "..." });
+
+      const response = await axios.post(`${BACKEND_URL}/api/waivers/save-signature`, payload);
+      
+      console.log("Signature saved successfully:", response.data);
  
       // Clear localStorage after signature submission for security
-      // Prevents users from modifying signed data by going back
       localStorage.removeItem("signatureForm");
       
-      toast.success("Signature submitted sucessfully.");
+      toast.success("Signature submitted successfully.");
       dispatch(setCurrentStep('RULE_REMINDER'));
       navigate("/rules", { replace: true });
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to save signature.");
-    } finally {
+      console.error("Error saving signature:", error);
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+        toast.error(error.response.data?.error || "Failed to save signature.");
+      } else {
+        toast.error("Failed to save signature. Please try again.");
+      }
       setSubmitting(false);
     }
   };
@@ -344,6 +350,12 @@ function formatPhone(phone = "") {
   const handleBackClick = () => {
     // Clear localStorage when going back
     localStorage.removeItem("signatureForm");
+    
+    // If in viewMode, go back to my waivers instead of confirm-info
+    if (viewMode) {
+      navigate("/my-waivers", { replace: true });
+      return;
+    }
     
     if (customerType === "new") {
       navigate("/verify-otp", { replace: true });
@@ -511,7 +523,7 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
                     <input
                       type="text"
                       className={`form-control ${minorErrors[`${index}_first_name`] ? 'is-invalid' : ''}`}
-                      placeholder="Full Name"
+                      placeholder="First Name"
                       value={minor.first_name}
                       onChange={(e) => handleMinorChange(index, "first_name", e.target.value)}
                       readOnly={!minor.isNew}
@@ -532,7 +544,7 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
                     <input
                       type="text"
                       className={`form-control ${minorErrors[`${index}_last_name`] ? 'is-invalid' : ''}`}
-                      placeholder="Full Name"
+                      placeholder="Last Name"
                       value={minor.last_name}
                       onChange={(e) => handleMinorChange(index, "last_name", e.target.value)}
                       readOnly={!minor.isNew}
@@ -663,13 +675,9 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
                 >
                   {submitting 
                     ? "Processing..." 
-                    : viewCompleted
+                    : (viewCompleted || viewMode) && !createNewWaiver
                       ? "Return to My Waivers"
-                      : viewMode 
-                        ? "Return to My Waivers" 
-                        : createNewWaiver 
-                          ? "Accept and continue"
-                          : "Accept and continue"}
+                      : "Accept and continue"}
                 </button>
               </div>
             </div>

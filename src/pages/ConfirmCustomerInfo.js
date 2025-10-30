@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { BACKEND_URL } from "../config";
 import UserHeader from "../components/UserHeader";
-import { setCurrentStep, setCustomerData, setMinors, setWaiverId } from "../store/slices/waiverSessionSlice";
+import { setCurrentStep, setCustomerData, setMinors, setWaiverId, setViewMode } from "../store/slices/waiverSessionSlice";
 
 function ConfirmCustomerInfo() {
   const navigate = useNavigate();
@@ -299,6 +299,7 @@ function ConfirmCustomerInfo() {
     const stripMask = (val) => (val ? val.replace(/\D/g, "") : "");
     const updatedData = {
       ...formData,
+      id: formData.id || customerId, // Ensure customer ID is always included
       cell_phone: stripMask(formData.cell_phone),
       minors: minorList.map((minor) => ({
         id: minor.id,
@@ -344,6 +345,9 @@ function ConfirmCustomerInfo() {
         // Clear the old waiverId since we're creating a new one
         // The backend will create a new unsigned waiver for this user
         dispatch(setWaiverId(null));
+        
+        // Set viewMode to false since we're creating a new waiver that needs to be signed
+        dispatch(setViewMode(false));
         
         console.log("✅ Created new unsigned waiver for modified data");
       } catch (err) {

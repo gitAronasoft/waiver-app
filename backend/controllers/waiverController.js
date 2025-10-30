@@ -621,17 +621,20 @@ const saveSignature = async (req, res) => {
     if (minors && minors.length > 0) {
       for (const minor of minors) {
         if (minor.isNew) {
-          // Insert new minor
-          await db.query(
-            "INSERT INTO minors (user_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, ?)",
-            [
-              id,
-              minor.first_name,
-              minor.last_name,
-              minor.dob,
-              minor.checked ? 1 : 0,
-            ],
-          );
+          // Insert new minor - only if all required fields are present
+          if (minor.first_name && minor.last_name && minor.dob) {
+            await db.query(
+              "INSERT INTO minors (user_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, ?)",
+              [
+                id,
+                minor.first_name,
+                minor.last_name,
+                minor.dob,
+                1, // Always set status to 1 (active) for new minors
+              ],
+            );
+            console.log(`✅ Added new minor ${minor.first_name} ${minor.last_name} for user ${id}`);
+          }
         } else if (minor.id) {
           // Update existing minor
           submittedMinorIds.push(minor.id);
@@ -659,15 +662,17 @@ const saveSignature = async (req, res) => {
       console.log(`🗑️ Deleted ${minorsToDelete.length} minor(s) from user ${id}`);
     }
 
-    // Build snapshot data using submitted minors that are checked
-    // This ensures the snapshot reflects the exact minors selected for this waiver
+    // Build snapshot data using submitted minors that have all required fields
+    // Filter out any incomplete minors before creating snapshot
     const checkedMinors = (minors || [])
-      .filter(m => m.checked)
+      .filter(m => m.first_name && m.last_name && m.dob)
       .map(m => ({
         first_name: m.first_name,
         last_name: m.last_name,
         dob: m.dob
       }));
+    
+    console.log(`📸 Creating snapshot with ${checkedMinors.length} minor(s) for user ${id}`);
 
     const snapshotData = {
       signer_name: `${user.first_name} ${user.last_name}`,
