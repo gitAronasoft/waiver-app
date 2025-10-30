@@ -51,12 +51,12 @@ const sendFeedback = async (req, res) => {
     if (message || issue || staff_name) {
       try {
         const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: process.env.SMTP_PORT,
+          host: process.env.SMTP_HOST || 'smtp.gmail.com',
+          port: process.env.SMTP_PORT || 587,
           secure: true,
           auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
           },
           tls: { rejectUnauthorized: false }
         });
@@ -103,8 +103,8 @@ const sendFeedback = async (req, res) => {
         `;
 
         await transporter.sendMail({
-          from: process.env.SMTP_USER,
-          to: process.env.SMTP_USER, 
+          from: process.env.EMAIL_USER,
+          to: process.env.EMAIL_USER, 
           subject: `Customer Feedback - ${customer.first_name} ${customer.last_name}`,
           html: htmlTemplate
         });

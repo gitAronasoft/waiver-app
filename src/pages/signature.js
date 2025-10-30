@@ -264,7 +264,7 @@ function Signature() {
     if (viewMode) {
       navigate("/rules", {
         replace: true,
-        state: { userId: customerData?.id, phone, customerType },
+        state: { userId: customerData?.id, phone, customerType, waiverId },
       });
       return;
     }
@@ -376,13 +376,14 @@ function Signature() {
     try {
       await axios.post(`${BACKEND_URL}/api/waivers/save-signature`, payload);
  
-      // Keep localStorage so data persists when going back from rules page
-      // It will be cleared on the AllDone page after final completion
+      // Clear localStorage after signature submission for security
+      // Prevents users from modifying signed data by going back
+      localStorage.removeItem("signatureForm");
       
       toast.success("Signature submitted sucessfully.");
       navigate("/rules", {
         replace: true,
-        state: { userId: customerData?.id, phone, customerType },
+        state: { userId: customerData?.id, phone, customerType, waiverId },
       });
     } catch (error) {
       console.error(error);
@@ -435,7 +436,7 @@ function formatPhone(phone = "") {
 
   return (
     <>
-      <UserHeader showBack={true} onBack={handleBackClick} />
+      <UserHeader showBack={customerType === "existing"} onBack={handleBackClick} />
       <div className="container-fluid">
         <div className="container">
           <div className="row">

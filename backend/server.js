@@ -10,6 +10,9 @@ const authRoutes = require('./routes/authRoutes');
 const staffRoutes = require('./routes/staffRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 
+// Initialize rating email/SMS scheduler
+require('./ratingEmailScheduler');
+
 const app = express();
 
 // Serve uploaded files statically

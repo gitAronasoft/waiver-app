@@ -10,7 +10,7 @@ function RuleReminder() {
   const location = useLocation();
   const userId = location.state?.userId;
   const phone = location.state?.phone;
-  const customerType = location.state?.customerType || "existing";
+  const waiverId = location.state?.waiverId;
   const [loading, setLoading] = useState(false);
 
   // Route protection: Redirect if accessed directly without valid state
@@ -21,13 +21,30 @@ function RuleReminder() {
     }
   }, [userId, phone, navigate]);
 
+  // Prevent browser back button navigation
+  React.useEffect(() => {
+    // Push current state to prevent back navigation
+    window.history.pushState(null, "", window.location.href);
+    
+    const handlePopState = () => {
+      // Push state again to prevent going back
+      window.history.pushState(null, "", window.location.href);
+    };
+    
+    window.addEventListener("popstate", handlePopState);
+    
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      await axios.post(`${BACKEND_URL}/api/waivers/accept-rules`, { userId });
+      await axios.post(`${BACKEND_URL}/api/waivers/accept-rules`, { userId, waiverId });
       localStorage.removeItem("signatureForm"); // Clear saved signature and form data
       toast.success("Rules accepted!");
-      navigate("/all-done", { replace: true, state: { completed: true } });
+      navigate("/all-done", { replace: true, state: { completed: true, waiverId, phone } });
     } catch (error) {
       console.error(error);
       toast.error("Failed to update waiver status.");
@@ -38,11 +55,7 @@ function RuleReminder() {
 
   return (
     <>
-      <UserHeader 
-        showBack={true} 
-        backTo="/signature" 
-        backState={{ phone, customerType, userId }}
-      />
+      <UserHeader />
       <div className="container-fluid">
         <div className="container text-center">
           <div className="row">

@@ -227,7 +227,10 @@ function UserDashboard() {
                 <div className="text-center mt-4 mb-3">
                   <button 
                     onClick={() => {
-                      localStorage.clear();
+                      // Clear all flow tracking and session data
+                      localStorage.removeItem("userFlow");
+                      localStorage.removeItem("signatureForm");
+                      localStorage.removeItem("customerForm");
                       navigate("/", { replace: true });
                     }}
                     className="btn px-4 py-2" 

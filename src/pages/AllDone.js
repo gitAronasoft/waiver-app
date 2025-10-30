@@ -11,6 +11,7 @@ function AllDone() {
   const completed = location.state?.completed;
   const skipToMyWaivers = location.state?.skipToMyWaivers;
   const phone = location.state?.phone;
+  const waiverId = location.state?.waiverId;
 
   const handleReturn = () => {
     // Clear all form data
@@ -33,7 +34,7 @@ function AllDone() {
       return;
     }
 
-    // Clear localStorage when component mounts
+    // Clear form data when component mounts (but keep userFlow)
     localStorage.removeItem("signatureForm");
     localStorage.removeItem("customerForm");
     
@@ -42,10 +43,20 @@ function AllDone() {
       setCountdown((prev) => {
         if (prev === 1) {
           clearInterval(interval);
-          // Redirect based on skipToMyWaivers flag
-          if (skipToMyWaivers && phone) {
+          
+          // Check userFlow to determine navigation
+          const userFlow = localStorage.getItem("userFlow");
+          
+          // Existing customers always go to dashboard after completion
+          if (userFlow === "existing" && phone) {
+            navigate("/my-waivers", { replace: true, state: { phone } });
+          } 
+          // New customers can optionally go to dashboard or home
+          else if (skipToMyWaivers && phone) {
             navigate("/my-waivers", { replace: true, state: { phone } });
           } else {
+            // Clear flow tracking when going back to home
+            localStorage.removeItem("userFlow");
             navigate("/", { replace: true });
           }
         }
@@ -55,6 +66,23 @@ function AllDone() {
 
     return () => clearInterval(interval);
   }, [navigate, completed, skipToMyWaivers, phone]);
+
+  // Prevent browser back button navigation
+  useEffect(() => {
+    // Push current state to prevent back navigation
+    window.history.pushState(null, "", window.location.href);
+    
+    const handlePopState = () => {
+      // Push state again to prevent going back
+      window.history.pushState(null, "", window.location.href);
+    };
+    
+    window.addEventListener("popstate", handlePopState);
+    
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
 
   return (

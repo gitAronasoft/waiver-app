@@ -11,6 +11,8 @@ function VerifyOtp() {
   const navigate = useNavigate();
   const phone = location.state?.phone;
   const customerType = location.state?.customerType || "existing";
+  const waiverId = location.state?.waiverId;
+  const userId = location.state?.userId;
   const otpVerifiedRef = useRef(false);
 
   // console.log("OTP Verified:", customerType);
@@ -68,7 +70,7 @@ const verifyOtp = async (otpValue) => {
         // Both existing customer and dashboard go to history dashboard
         navigate("/my-waivers", { replace: true, state: { phone } });
       } else if (customerType === "new") {
-        navigate("/signature", { replace: true, state: { phone, customerType } });
+        navigate("/signature", { replace: true, state: { phone, customerType, waiverId, userId } });
       }
     } else {
       toast.error("Invalid OTP. Please try again.");

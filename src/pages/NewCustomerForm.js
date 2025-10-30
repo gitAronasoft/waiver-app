@@ -216,16 +216,30 @@ function NewCustomerForm() {
     };
 
     try {
-      await axios.post(`${BACKEND_URL}/api/waivers`, fullData);
+      const response = await axios.post(`${BACKEND_URL}/api/waivers`, fullData);
+      const { waiverId, userId } = response.data;
+      
+      // Preserve flow tracking
+      localStorage.setItem("userFlow", "new");
+      
       if (isChecked) {
         toast.success(`Customer created and OTP sent successfully.`);
         navigate("/opt-verified", {
-          state: { phone: stripMask(formData.cell_phone), customerType: "new" },
+          state: { 
+            phone: stripMask(formData.cell_phone), 
+            customerType: "new",
+            waiverId,
+            userId
+          },
         });
       } else {
         toast.success("Customer created successfully. Skipping OTP.");
         navigate("/signature", {
-          state: { phone: stripMask(formData.cell_phone) },
+          state: { 
+            phone: stripMask(formData.cell_phone),
+            waiverId,
+            userId
+          },
         });
       }
     } catch (err) {

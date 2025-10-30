@@ -159,12 +159,12 @@ const forgetPassword = async (req, res) => {
 
     // Send password reset email
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: process.env.SMTP_PORT || 587,
       secure: true,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
       },
       tls: { rejectUnauthorized: false }
     });
@@ -214,7 +214,7 @@ const forgetPassword = async (req, res) => {
     `;
 
     await transporter.sendMail({
-      from: process.env.SMTP_USER,
+      from: process.env.EMAIL_USER,
       to: email,
       subject: 'Reset Your Admin Password - Skate & Play',
       html: htmlTemplate
@@ -552,12 +552,12 @@ const addStaff = async (req, res) => {
 
     // Setup nodemailer
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: process.env.SMTP_PORT || 587,
       secure: true,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
       tls: { rejectUnauthorized: false },
     });
@@ -612,7 +612,7 @@ const addStaff = async (req, res) => {
     try {
       console.log('📤 Attempting to send email...');
       const info = await transporter.sendMail({
-        from: process.env.SMTP_USER,
+        from: process.env.EMAIL_USER,
         to: email,
         subject: "Welcome to Skate & Play - Set Up Your Account",
         html: htmlTemplate,

@@ -115,6 +115,8 @@ function ExistingCustomerLogin() {
       const fullPhone = `${countryCode}${cleanPhone}`;   
       const res = await axios.post(`${BACKEND_URL}/api/auth/send-otp`, { cell_phone: fullPhone, phone: cleanPhone });
       toast.success(res.data.message);
+      // Preserve flow tracking in localStorage
+      localStorage.setItem("userFlow", "existing");
       navigate("/opt-verified", { state: { phone: cleanPhone, customerType: "existing" } });
     } catch (err) {
       toast.error(err?.response?.data?.message || "Error sending OTP. Please try again.");

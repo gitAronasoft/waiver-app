@@ -6,8 +6,12 @@ export default function Index() {
 
   const handleStart = (type) => {
     if (type === "existing") {
+      // Set flow identifier for existing customer
+      localStorage.setItem("userFlow", "existing");
       navigate("/existing-customer", { state: { customerType: "dashboard" } });
     } else {
+      // Set flow identifier for new customer
+      localStorage.setItem("userFlow", "new");
       navigate("/new-customer", { state: { customerType: "new" } });
     }
   };

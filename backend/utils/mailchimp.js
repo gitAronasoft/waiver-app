@@ -2,8 +2,8 @@ const axios = require("axios");
 require("dotenv").config();
 
 const MAILCHIMP_API_KEY = process.env.MAILCHIMP_API_KEY;
-const LIST_ID = process.env.MAILCHIMP_LIST_ID;
-const DATACENTER = process.env.MAILCHIMP_DC;
+const LIST_ID = process.env.MAILCHIMP_AUDIENCE_ID;
+const DATACENTER = process.env.MAILCHIMP_SERVER_PREFIX;
 
 /**
  * Add a user to Mailchimp list with additional fields

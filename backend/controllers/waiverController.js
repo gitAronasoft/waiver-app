@@ -180,7 +180,7 @@ const createWaiver = async (req, res) => {
         try {
           await client.messages.create({
             body: `Your verification code is ${otp} for your Skate & Play waiver. Enjoy your roller skating session.`,
-            messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+            from: process.env.TWILIO_PHONE_NUMBER,
             to: formattedPhone,
           });
           console.log(
@@ -764,29 +764,36 @@ const saveSignature = async (req, res) => {
  */
 const acceptRules = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId, waiverId } = req.body;
 
-    // Validate userId
+    // Validate userId and waiverId
     if (!userId) {
       return res.status(400).json({
         error: "User ID is required",
       });
     }
 
+    if (!waiverId) {
+      return res.status(400).json({
+        error: "Waiver ID is required",
+      });
+    }
+
+    // Verify that waiverId belongs to userId (prevents cross-waiver tampering)
     const [waivers] = await db.query(
-      "SELECT id FROM waivers WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
-      [userId],
+      "SELECT id FROM waivers WHERE id = ? AND user_id = ?",
+      [waiverId, userId],
     );
 
     if (waivers.length === 0) {
       return res.status(404).json({
-        error: "No waiver form found for this user",
+        error: "Waiver not found or does not belong to this user",
       });
     }
 
     await db.query(
       "UPDATE waivers SET rules_accepted = 1, completed = 1 WHERE id = ?",
-      [waivers[0].id],
+      [waiverId],
     );
 
     // MAILCHIMP INTEGRATION - Auto-subscribe to mailing list
@@ -1484,8 +1491,7 @@ const getCustomerDashboard = async (req, res) => {
         END as verified_by_name
       FROM waivers w
       LEFT JOIN staff s ON w.verified_by_staff = s.id
-      WHERE w.user_id IN (?) AND w.completed = 1
-      ORDER BY w.created_at DESC`,
+      WHERE w.user_id IN (?) ORDER BY w.created_at DESC`,
       [userIds],
     );
 

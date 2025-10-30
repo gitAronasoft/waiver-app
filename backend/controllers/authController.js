@@ -65,7 +65,7 @@ const sendOtp = async (req, res) => {
     try {
       await client.messages.create({
         body: `Your verification code is ${otp} for your Skate & Play waiver. Enjoy your roller skating session.`,
-        messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+        from: process.env.TWILIO_PHONE_NUMBER,
         to: formattedPhone
       });
       console.log(`✅ OTP SMS sent to ${formattedPhone}`);
