@@ -109,7 +109,7 @@ function Signature() {
         }
       } catch (error) {
         console.error("Failed to load customer data:", error);
-        toast.error("Failed to load customer data.");
+        toast.error("We couldn't load your information. Please go back and try again.");
       } finally {
         setLoading(false);
       }
@@ -197,13 +197,13 @@ function Signature() {
     setMinorErrors({});
 
     if (!form.consented) {
-      toast.error("Please agree to the terms by checking the consent box.");
+      toast.error("Please review and check the consent box to proceed.");
       setSubmitting(false);
       return;
     }
 
     if (!sigPadRef.current || sigPadRef.current.isEmpty()) {
-      toast.error("Please provide your signature before continuing.");
+      toast.error("Your signature is required to complete the waiver.");
       setSubmitting(false);
       return;
     }
@@ -254,7 +254,7 @@ function Signature() {
     // If there are validation errors, set them and show toast
     if (hasErrors) {
       setMinorErrors(validationErrors);
-      toast.error("Please complete all required information for minors correctly.");
+      toast.error("Please complete all required fields for each minor before continuing.");
       setSubmitting(false);
       return;
     }
@@ -310,16 +310,16 @@ function Signature() {
       // Clear localStorage after signature submission for security
       localStorage.removeItem("signatureForm");
       
-      toast.success("Signature submitted successfully.");
+      toast.success("Thank you! Your waiver has been submitted successfully.");
       dispatch(setCurrentStep('RULE_REMINDER'));
       navigate("/rules", { replace: true });
     } catch (error) {
       console.error("Error saving signature:", error);
       if (error.response) {
         console.error("Response data:", error.response.data);
-        toast.error(error.response.data?.error || "Failed to save signature.");
+        toast.error(error.response.data?.error || "We couldn't save your signature. Please try again.");
       } else {
-        toast.error("Failed to save signature. Please try again.");
+        toast.error("We couldn't save your signature. Please check your connection and try again.");
       }
       setSubmitting(false);
     }

@@ -104,12 +104,12 @@ function ExistingCustomerLogin() {
     const cleanPhone = phone.replace(/\D/g, "");
     
     if (cleanPhone.length === 0) {
-      toast.error("Please enter your phone number");
+      toast.error("Please enter your phone number to continue.");
       return;
     }
     
     if (cleanPhone.length < 10) {
-      toast.error(`Phone number must be exactly 10 digits. You entered ${cleanPhone.length} digits.`);
+      toast.error(`Phone number must be exactly 10 digits. You entered ${cleanPhone.length} digit${cleanPhone.length !== 1 ? 's' : ''}.`);
       return;
     }
     
@@ -125,7 +125,7 @@ function ExistingCustomerLogin() {
       dispatch(setCurrentStep('OTP_VERIFICATION'));
       navigate("/opt-verified");
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Error sending OTP. Please try again.");
+      toast.error(err?.response?.data?.message || "We couldn't send the verification code. Please check your phone number and try again.");
     } finally {
       setLoading(false);
     }

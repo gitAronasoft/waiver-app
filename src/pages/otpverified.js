@@ -45,12 +45,12 @@ const verifyOtp = async (otpValue) => {
   if (otpVerifiedRef.current) return;
   
   if (!otpValue || otpValue.trim() === "") {
-    toast.error("Please enter the OTP code");
+    toast.error("Please enter the 4-digit code sent to your phone.");
     return;
   }
   
   if (otpValue.length < 4) {
-    toast.error(`OTP must be 4 digits. You entered ${otpValue.length} digits.`);
+    toast.error(`The code must be 4 digits. You entered ${otpValue.length} digit${otpValue.length !== 1 ? 's' : ''}.`);
     return;
   }
   
@@ -64,7 +64,7 @@ const verifyOtp = async (otpValue) => {
     });
 
     if (res.data.authenticated) {
-      toast.success("OTP Verified Successfully!");
+      toast.success("Phone number verified successfully!");
 
       if (flowType === "existing") {
         dispatch(setCurrentStep('DASHBOARD'));
@@ -74,13 +74,13 @@ const verifyOtp = async (otpValue) => {
         navigate("/signature", { replace: true });
       }
     } else {
-      toast.error("Invalid OTP. Please try again.");
+      toast.error("The code you entered is incorrect. Please try again.");
       otpVerifiedRef.current = false;
       setLoading(false);
       setOtp("");
     }
   } catch (err) {
-    toast.error(err?.response?.data?.message || "OTP verification failed. Please try again.");
+    toast.error(err?.response?.data?.message || "We couldn't verify your code. Please try again or request a new code.");
     otpVerifiedRef.current = false;
     setLoading(false);
     setOtp("");

@@ -39,10 +39,10 @@ const feedbackId = query.get('feedbackId');
         message: feedback
       });
 
-      toast.success('Feedback submitted successfully!');
+      toast.success('Thank you for your feedback. We appreciate your input and will use it to improve our service.');
       setSubmitted(true);
     } catch (err) {
-      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to send feedback. Try again later.');
+      toast.error(err.response?.data?.error || err.response?.data?.message || "We couldn't submit your feedback. Please try again later.");
     } finally {
       setLoading(false);
     }

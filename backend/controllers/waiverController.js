@@ -912,6 +912,7 @@ const getAllCustomers = async (req, res) => {
   try {
     // Fetch waivers with snapshot data (no joins with users/minors tables)
     // Filter out verified waivers (only show waivers that need verification)
+    // Show waivers that have been signed (have signature_image) instead of waiting for rules acceptance
     const [waivers] = await db.query(`
       SELECT 
         w.user_id as id,
@@ -930,7 +931,7 @@ const getAllCustomers = async (req, res) => {
         w.completed,
         w.minors_snapshot
       FROM waivers w
-      WHERE w.completed = 1 AND (w.verified_by_staff IS NULL OR w.verified_by_staff = 0)
+      WHERE w.signature_image IS NOT NULL AND (w.verified_by_staff IS NULL OR w.verified_by_staff = 0)
       ORDER BY w.created_at DESC
     `);
 

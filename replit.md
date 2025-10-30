@@ -1,98 +1,64 @@
-# Waiver Management System
+# Skate & Play Waiver Management System - Compressed Documentation
 
 ## Overview
-This project is a full-stack waiver management system designed for businesses like Skate & Play. It enables customers to digitally sign waivers, including support for multiple submissions with the same phone number and the inclusion of minors. The system provides customers with a dashboard to view their waiver history and offers comprehensive administrative tools for managing customers, staff, and feedback. The core business vision is to modernize waiver processes, improve customer experience, and streamline operations for recreational facilities, offering significant market potential for digital transformation.
 
-## Recent Changes (October 29, 2025)
+The Skate & Play Waiver Management System is a full-stack digital solution for managing customer waivers. It enables digital waiver signing with signature capture, supports multiple waivers per phone number, handles minor management, provides customer access to their waiver history, and offers extensive administrative tools for verification and customer management. The system aims to streamline the waiver process, improve compliance, and enhance operational efficiency for recreational facilities.
 
-### Database Architecture Redesign - Complete
-Successfully implemented "one user per phone number" architecture with historical snapshot preservation:
-
-**✅ Database Migration:**
-- Dropped old tables: `customers`, `waiver_forms`
-- Created new schema: `users`, `waivers` (with snapshot columns), `minors`, `waiver_minors`, `otps`, `staff`, `feedback`
-- Snapshot columns on `waivers` table: `signer_name`, `signer_email`, `signer_address`, `signer_city`, `signer_province`, `signer_postal`, `signer_dob`, `minors_snapshot` (JSON)
-
-**✅ Backend Controller Updates:**
-- `createWaiver`: Now finds existing user by phone or creates new one (enforces single user per phone)
-- `createWaiver`: Deactivates old minors before inserting new ones (prevents duplicate minors)
-- `saveSignature`: Stores complete snapshot data when waiver is signed
-- All admin endpoints (`getAllWaivers`, `getWaiverDetails`, `getAllCustomers`, `getUserHistory`): Updated to read from snapshot data instead of joining with live `users`/`minors` tables
-
-**✅ Frontend Updates:**
-- `UserDashboard`: Removed "Sign New Waiver" and "Home" buttons (users must logout to create new waiver)
-- `UserDashboard`: Added "Logout" button that clears localStorage and redirects to home
-
-**✅ Data Flow:**
-1. First waiver: Creates new user + waiver (snapshot empty until signed)
-2. Signature: Fills in snapshot with current user/minor data
-3. Second waiver (same phone): Updates user info, deactivates old minors, creates new waiver with new snapshot
-4. Admin views: Always show historical snapshot data, not current user data
-
-**✅ Benefits:**
-- Admins see waivers exactly as they were signed (historical accuracy)
-- Users can update their info without affecting past waivers
-- No more duplicate user records per waiver
-- Clean data integrity with foreign key constraints
+**Key Capabilities:**
+- Digital waiver signing with OTP-based phone verification.
+- Management of multiple waivers and minors per customer.
+- Customer dashboard for viewing waiver history.
+- Admin dashboard for waiver verification, customer, and staff management.
+- Comprehensive feedback system and automated rating requests.
+- Historical data snapshotting for legal compliance.
 
 ## User Preferences
-I prefer simple language in explanations. I want iterative development, with frequent, small updates rather than large, infrequent ones. Please ask before making major changes or architectural decisions. Do not make changes to the `Backend-old` folder or any duplicate components.
+
+- Simple language in explanations
+- Iterative development with frequent small updates
+- Ask before major architectural changes
+- Do NOT modify `Backend-old` folder or duplicate components
 
 ## System Architecture
 
-### UI/UX Decisions
-The frontend features a Nintendo-style aesthetic with consistent theme colors. Key UI elements include searchable country code dropdowns with real-time filtering, comprehensive loading states, and clear visual feedback for form validations. Button reordering on the main screen prioritizes "Existing Customer" over "New Waiver."
+The system follows a "one user per phone number" database architecture with historical snapshot preservation. This ensures unique user identification, allows for unlimited waivers per user, and maintains an immutable record of waiver data at the time of signing.
 
-### Technical Implementations
-The system comprises a React frontend and a Node.js/Express backend.
+**UI/UX Decisions:**
+- **Frontend Framework**: React 19 with Redux Toolkit for state management.
+- **Styling**: Bootstrap 5 provides a responsive and consistent user interface.
+- **Design Language**: Modern card-based UI with purple (#6C5CE7), yellow (#FFD93D), and brown (#DCC07C) color scheme. Cards feature 20px border-radius, subtle shadows (0px 4px 30px rgba(0, 0, 0, 0.06)), and 3px colored bottom borders with hover effects.
+- **User Dashboard**: Card-based responsive grid layout (1 column mobile, 2 tablet, 3 desktop) displaying waiver history. Each card has purple gradient header with status badges, colored icon boxes for information sections, and interactive hover effects (lift and border color change).
+- **Workflow**: Guided, step-by-step customer waiver flow; intuitive admin dashboards.
 
-**Frontend (React)**
--   **Framework**: React 19
--   **Routing**: React Router DOM 7
--   **API Communication**: Axios
--   **Notifications**: React Toastify
--   **Digital Signatures**: React Signature Canvas with JPEG compression
--   **Styling**: Bootstrap 5
--   **Loading States**: React Loading Skeleton
--   **Environment Configuration**: Centralized `config.js` for dynamic backend URL detection.
+**Technical Implementations:**
+- **Database**: MySQL (MariaDB 11.8.3) with a schema designed for user, waiver, minor, staff, OTP, and feedback data.
+    - `users`: Stores current customer information (one per phone number).
+    - `waivers`: Stores historical waiver data, including `signer_*` snapshot columns and `minors_snapshot` (JSON) to preserve data at signing time.
+    - `minors`: Stores current active minor profiles linked to users; old minors are deactivated (`status=0`).
+    - `otps`: Temporary storage for one-time passwords, expiring in 5 minutes and deleted after verification.
+    - `staff`: Manages admin accounts with role-based access control (`staff`, `admin`, `superadmin`).
+    - `feedback`: Records customer ratings and messages, linked to users.
+- **Backend**: Node.js with Express 4, providing RESTful API endpoints for all functionalities.
+- **Authentication**: JWT for staff/admin, Twilio-based OTP for customer verification.
+- **State Management**: Redux Toolkit with `redux-persist` for customer waiver flow (`waiverSession`) and admin authentication (`auth`) state persistence.
+- **API Endpoints**: Categorized for authentication, waiver management, staff management, and feedback.
+    - **Waiver Flow**: Endpoints manage customer data updates, minor deactivation/insertion, signature capture, and historical snapshot creation.
+    - **Admin Tools**: Endpoints for daily waiver verification, full waiver history, staff CRUD operations, and feedback review.
 
-**Backend (Node.js/Express)**
--   **Architecture**: RESTful API
--   **Authentication**: JWT for admin users, Bcrypt for password hashing
--   **Database Interaction**: MySQL connection pooling
--   **Security**: CORS enabled, server-side input validation, comprehensive error handling, SQL injection prevention.
--   **Features**: Allows multiple waivers per phone number, supports adding multiple minors to a waiver, OTP verification, and admin dashboards.
-
-### Feature Specifications
--   **Customer Features**: Unlimited waivers per phone, digital signature capture, minor support, OTP verification, user dashboard for waiver history, and a star rating feedback system.
--   **Admin Features**: Dashboard for completed waivers, waiver verification, detailed customer profiles, staff management (add, edit, delete, roles), feedback management, and secure authentication with password management.
-
-### System Design Choices
-
-**Database Schema**:
-- **`users`**: Stores user information (one record per phone number), including current/latest contact details.
-- **`waivers`**: Stores waiver records with historical snapshots of user data at the time of signing. Each waiver links to a user and includes snapshot columns for `signer_name`, `signer_email`, `signer_address`, `signer_dob`, and `minors_snapshot`.
-- **`minors`**: Stores minor profiles, linked to users.
-- **`waiver_minors`** (Junction Table): Links specific minors to specific waivers.
-- **`otps`**: Stores temporary one-time passwords.
-- **`staff`**: Stores admin and staff accounts with role-based access control.
-- **`feedback`**: Stores customer ratings and feedback.
-
-**Performance Optimizations**:
-- Indexes on `users.cell_phone` and `waivers.user_id` for fast lookups.
-- Foreign key constraints with CASCADE delete for data integrity.
-- Batch queries for dashboard endpoint to minimize database round-trips.
-- Transaction support for waiver creation.
-
-**Data Integrity**:
-- Foreign keys with CASCADE delete rules maintain referential integrity across `users`, `waivers`, `minors`, `waiver_minors`, and `feedback` tables.
+**Feature Specifications:**
+- **Minor Management**: Minors associated with a user can be updated; the system deactivates old minor records and creates new ones to maintain data integrity for future waivers, while past waivers retain their `minors_snapshot`.
+- **Historical Snapshotting**: Upon signature, current user and active minor data are captured and stored directly within the `waivers` table, ensuring legal immutability of signed documents.
+- **Signature Compression**: Digital signatures are captured, converted to JPEG format with 50% quality, significantly reducing storage size.
+- **OTP Security**: OTPs are 4-digit, expire in 5 minutes, are single-use, and invalidate previous OTPs upon new request.
+- **Role-Based Access Control**: Admin functionalities are secured by JWT and restricted based on staff roles (`staff`, `admin`, `superadmin`).
+- **PDF Generation**: Optimized to generate multi-page PDFs from waiver data with reduced file sizes (50-80KB).
 
 ## External Dependencies
 
--   **Database**: Remote MySQL (MariaDB 11.8.3)
--   **Authentication**: JSON Web Tokens (JWT)
--   **Password Hashing**: Bcrypt
--   **SMS/OTP**: Twilio
--   **Email Marketing**: Mailchimp
--   **Email Notifications**: Nodemailer (SMTP configured)
--   **Scheduling**: Node-cron for automated tasks.
+-   **Twilio**: Used for sending SMS-based One-Time Passwords (OTPs) for customer phone verification.
+-   **Mailchimp**: Integrates with the `createWaiver` API to automatically add new customers to a marketing email list.
+-   **Nodemailer**: Utilized for sending email notifications, including password reset links for staff, feedback notifications to admins, and new staff account setup emails.
+-   **Node-Cron**: Schedules automated tasks, such as sending rating requests to customers 24 hours after their waiver signing.
+-   **React Signature Canvas**: Frontend library for capturing digital signatures.
+-   **Axios**: HTTP client for making API requests from the frontend.
+-   **html2canvas**: Used in PDF generation to convert HTML elements to canvas images.

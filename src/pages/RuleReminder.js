@@ -45,11 +45,11 @@ function RuleReminder() {
     try {
       await axios.post(`${BACKEND_URL}/api/waivers/accept-rules`, { userId, waiverId });
       dispatch(setCurrentStep('COMPLETED'));
-      toast.success("Rules accepted!");
+      toast.success("Thank you for reviewing our facility rules!");
       navigate("/all-done", { replace: true });
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update waiver status.");
+      toast.error("We couldn't save your confirmation. Please try again.");
     } finally {
       setLoading(false);
     }

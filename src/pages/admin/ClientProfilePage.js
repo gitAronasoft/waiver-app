@@ -32,82 +32,7 @@ function ProfilePage() {
         console.error("Error loading customer:", err);
         setIsLoading(false);
       });
-  }, [id]);
-
-  // const handleDownloadPDF = async () => {
-  //   try {
-  //     const element = pdfRef.current;
-  //     const canvas = await html2canvas(element, { scale: 2 ,  useCORS: true});
-  //     const imgData = canvas.toDataURL("image/png");
-
-  //     const pdf = new jsPDF("p", "mm", "a4");
-  //     const pdfWidth = pdf.internal.pageSize.getWidth();
-  //     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-  //     pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-  //     pdf.save(`waiver-${id}.pdf`);
-  //   } catch (err) {
-  //     console.error("PDF generation failed", err);
-  //   }
-  // };
-
-// const handleDownloadPDF = async () => {
-//   try {
-//     const input = pdfRef.current;
-
-//     const canvas = await html2canvas(input, {
-//       scale: 1,
-//       useCORS: true,
-//       scrollY: -window.scrollY,
-//     });
-
-//     const pdf = new jsPDF("p", "mm", "a4");
-
-//     const margin = 10;
-//     const pageWidth = pdf.internal.pageSize.getWidth();   // 210mm
-//     const pageHeight = pdf.internal.pageSize.getHeight(); // 297mm
-//     const usableWidth = pageWidth - margin * 2;
-//     const usableHeight = pageHeight - margin * 2;
-
-//     const imgWidth = usableWidth;
-//     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-//     const pageCanvasHeight = (usableHeight * canvas.width) / imgWidth; // height of each slice in px
-
-//     let renderedHeight = 0;
-//     let pageIndex = 0;
-
-//     while (renderedHeight < canvas.height) {
-//       const pageCanvas = document.createElement("canvas");
-//       pageCanvas.width = canvas.width;
-//       pageCanvas.height = Math.min(pageCanvasHeight, canvas.height - renderedHeight);
-
-//       const context = pageCanvas.getContext("2d");
-//       context.drawImage(
-//         canvas,
-//         0,
-//         renderedHeight,
-//         canvas.width,
-//         pageCanvas.height,
-//         0,
-//         0,
-//         canvas.width,
-//         pageCanvas.height
-//       );
-
-//       const pageData = pageCanvas.toDataURL("image/png");
-//       if (pageIndex > 0) pdf.addPage();
-//       pdf.addImage(pageData, "PNG", margin, margin, imgWidth, (pageCanvas.height * imgWidth) / canvas.width);
-
-//       renderedHeight += pageCanvasHeight;
-//       pageIndex++;
-//     }
-
-//     pdf.save(`waiver-${id}.pdf`);
-//   } catch (err) {
-//     console.error("PDF generation failed", err);
-//   }
-// };
+  }, [id]);  
 
 const handleDownloadPDF = async (waiverId) => {
   try {
@@ -382,27 +307,21 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
       key={index}
       style={{
         display: "flex",
-        gap: "10px",
+        gap: "12px",
         alignItems: "center",
-        marginBottom: "10px",
+        marginBottom: "15px",
       }}
     >
-    <input
-  type="checkbox"
-  checked={minor.status === 1}
-  readOnly
-  style={{ transform: "scale(1.2)" }}
-/>
-
       <input
         type="text"
         value={minor.first_name}
         readOnly
         style={{
           flex: 1,
-          padding: "5px",
-          border: "1px solid #ccc",
-          borderRadius: "4px",
+          padding: "12px 15px",
+          border: "2px solid #333",
+          borderRadius: "8px",
+          fontSize: "16px",
         }}
       />
       <input
@@ -411,9 +330,10 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
         readOnly
         style={{
           flex: 1,
-          padding: "5px",
-          border: "1px solid #ccc",
-          borderRadius: "4px",
+          padding: "12px 15px",
+          border: "2px solid #333",
+          borderRadius: "8px",
+          fontSize: "16px",
         }}
       />
       <input
@@ -422,9 +342,10 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
         readOnly
         style={{
           flex: 1,
-          padding: "5px",
-          border: "1px solid #ccc",
-          borderRadius: "4px",
+          padding: "12px 15px",
+          border: "2px solid #333",
+          borderRadius: "8px",
+          fontSize: "16px",
         }}
       />
     </div>

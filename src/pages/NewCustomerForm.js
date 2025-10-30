@@ -251,11 +251,11 @@ function NewCustomerForm() {
       
       if (isChecked) {
         dispatch(setCurrentStep('OTP_VERIFICATION'));
-        toast.success(`Customer created and OTP sent successfully.`);
+        toast.success("Your information has been saved. Please check your phone for the verification code.");
         navigate("/opt-verified");
       } else {
         dispatch(setCurrentStep('SIGNATURE'));
-        toast.success("Customer created successfully. Skipping OTP.");
+        toast.success("Your information has been saved successfully.");
         navigate("/signature");
       }
     } catch (err) {
@@ -263,7 +263,7 @@ function NewCustomerForm() {
         toast.error(`${err.response.data.error}`);
       } else {
         console.error(err);
-        toast.error("Error submitting form. Please try again.");
+        toast.error("We couldn't submit your information. Please check the form and try again.");
       }
     } finally {
       setIsSubmitting(false);

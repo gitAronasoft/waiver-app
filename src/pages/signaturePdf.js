@@ -667,18 +667,19 @@ SIGNING THIS WAIVER I AM WAIVING CERTIAN LEGAL RIGHTS WHICH I OR MY HEIRS, NEXT 
 AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
 
             {form.minors.map((minor, index) => (
-              <div key={index} className="minor-group d-flex gap-2 align-items-center my-2">
-                <input
-                  type="checkbox"
-                  checked={minor.checked}
-                  onChange={() => handleMinorCheckbox(index)}
-                />
+              <div key={index} className="minor-group d-flex gap-3 align-items-center my-3">
                 <input
                   type="text"
                   className="form-control"
                   placeholder="Minor First Name"
                   value={minor.first_name}
                   onChange={(e) => handleMinorChange(index, "first_name", e.target.value)}
+                  style={{
+                    border: '2px solid #333',
+                    padding: '12px 15px',
+                    fontSize: '16px',
+                    borderRadius: '8px'
+                  }}
                 />
                 <input
                   type="text"
@@ -686,12 +687,24 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
                   placeholder="Minor Last Name"
                   value={minor.last_name}
                   onChange={(e) => handleMinorChange(index, "last_name", e.target.value)}
+                  style={{
+                    border: '2px solid #333',
+                    padding: '12px 15px',
+                    fontSize: '16px',
+                    borderRadius: '8px'
+                  }}
                 />
                 <input
                   type="date"
                   className="form-control"
                   value={minor.dob}
                   onChange={(e) => handleMinorChange(index, "dob", e.target.value)}
+                  style={{
+                    border: '2px solid #333',
+                    padding: '12px 15px',
+                    fontSize: '16px',
+                    borderRadius: '8px'
+                  }}
                 />
                 <button type="button" className="btn btn-danger no-print" onClick={() => handleRemoveMinor(index)}>
                   Remove
@@ -699,7 +712,10 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </span> </p>
               </div>
             ))}
 
-            <button className="btn btn-secondary my-2 no-print" onClick={handleAddMinor}>
+            <button className="btn btn-secondary my-3 no-print" onClick={handleAddMinor} style={{
+              padding: '10px 20px',
+              fontSize: '16px'
+            }}>
               Add another minor
             </button>
 

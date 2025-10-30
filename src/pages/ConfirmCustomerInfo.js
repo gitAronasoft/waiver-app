@@ -100,7 +100,7 @@ function ConfirmCustomerInfo() {
         .catch((err) => {
           console.error(err);
           toast.error(
-            err?.response?.data?.message || "Failed to fetch customer info.",
+            err?.response?.data?.message || "We couldn't load your information. Please try again.",
           );
         })
         .finally(() => {
@@ -263,7 +263,7 @@ function ConfirmCustomerInfo() {
     // Validate all new minors and show errors
     const isValid = validateAllNewMinors();
     if (!isValid) {
-      toast.error("Please complete all required fields for new minors.");
+      toast.error("Please complete all required information for each minor.");
       return;
     }
 
@@ -277,7 +277,7 @@ function ConfirmCustomerInfo() {
     });
 
     if (minorsWithFutureDOB.length > 0) {
-      toast.error("Date of birth cannot be in the future for any minor.");
+      toast.error("Please enter a valid date of birth for each minor. Future dates are not allowed.");
       return;
     }
 
@@ -352,7 +352,7 @@ function ConfirmCustomerInfo() {
         console.log("✅ Created new unsigned waiver for modified data");
       } catch (err) {
         console.error("Error creating new waiver:", err);
-        toast.error("Failed to create new waiver.");
+        toast.error("We couldn't create your new waiver. Please try again.");
         setUpdating(false);
         return;
       } finally {
@@ -368,7 +368,7 @@ function ConfirmCustomerInfo() {
         );
       } catch (err) {
         console.error("Error updating customer:", err);
-        toast.error("Failed to update customer info.");
+        toast.error("We couldn't update your information. Please try again.");
         setUpdating(false);
         return;
       } finally {
