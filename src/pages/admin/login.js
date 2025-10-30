@@ -45,11 +45,19 @@ function LoginPage() {
         password,
       });
 
-      toast.success(response.data.message);
-      console.log("Logged in staff:", response.data.staff);
+      // Save to Redux first
+      dispatch(login({
+        token: response.data.token,
+        staff: response.data.staff
+      }));
 
-      dispatch(login({ token: response.data.token, staff: response.data.staff }));
+      // Save to localStorage
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("staff", JSON.stringify(response.data.staff));
 
+      console.log('User logged in with role:', response.data.staff.role);
+
+      toast.success("Login successful!");
       navigate("/admin/home");
     } catch (err) {
       if (err.response) {

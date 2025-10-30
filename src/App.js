@@ -1,5 +1,5 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 
 import Index from "./pages/firstsetp";
 import NewCustomerForm from "./pages/NewCustomerForm";
@@ -25,11 +25,25 @@ import UpdateStaff from "./pages/admin/UpdateStaff";
 import AdminProfile from "./pages/admin/AdminProfile";
 import AdminFeedbackPage from "./pages/admin/AdminFeedbackPage";
 
-import AdminPrivateRoute from "./pages/components/AdminPrivateRoute"; // ✅ Import this
+import AdminPrivateRoute from "./pages/components/AdminPrivateRoute";
+import LoadingOverlay from "./components/LoadingOverlay";
 
-function App() {
+function AppContent() {
+  const location = useLocation();
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    setIsLoading(true);
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
   return (
-    <Router>
+    <>
+      <LoadingOverlay isVisible={isLoading} />
       <Routes>
         {/* Admin Public Route */}
         <Route path="/admin/login" element={<LoginAdmin />} />
@@ -135,6 +149,14 @@ function App() {
         <Route path="/my-waivers" element={<UserDashboard />} />
 
       </Routes>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }

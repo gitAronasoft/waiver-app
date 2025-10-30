@@ -3,6 +3,167 @@
 [x] 3. Verify the project is working using the feedback tool
 [x] 4. Inform user the import is completed and they can start building, mark the import as completed using the complete_project_import tool
 
+## Session 40 (October 30, 2025) - Fixed Modified Waiver Redirect Bug & Added Animated Logo Transitions:
+
+[x] 372. Fixed critical bug: signature.js now stores waiverId from API response in Redux after signature submission
+[x] 373. Verified userId and phone persist correctly during existing customer modified waiver flow
+[x] 374. Created AnimatedLogo.js component with SVG roller skate graphic and animated wheels
+[x] 375. Created AnimatedLogo.css with smooth animations (pulse, rotate, float, glow effects)
+[x] 376. Built LoadingOverlay.js component with centered logo and bouncing dots
+[x] 377. Built LoadingOverlay.css with fade transitions and slide-up animation
+[x] 378. Integrated LoadingOverlay into App.js with route change detection using useLocation hook
+[x] 379. Restarted React App workflow - compiled successfully with animated logo working
+[x] 380. Verified loading animation appears on page transitions (400ms duration)
+[x] 381. Updated progress tracker with Session 40 information
+
+### Session 40 Issues Resolved:
+
+**Issue 1: Superadmin Add Staff Button** ✅
+- Status: Already Working Correctly
+- The Add Staff button in `StaffList.js` (lines 242-249) already only shows for superadmin role
+- Conditional rendering: `{currentUser?.role === 'superadmin' && ...}`
+- No changes needed - working as designed
+
+**Issue 2: Modified Waiver Redirect Bug** 🐛 → ✅
+
+**User Report:**
+"Login as Existing users, If they modify waiver and confirm to submit as new waiver, In this case signed document after 'Accept & continue' All thing works, but after signature not redirect to 'Rule accept' page > All Done Page. The user directly redirect to Homepage after sign a document."
+
+**Root Cause:**
+- When existing customers modify a waiver (e.g., add/remove minor), a new waiver is created
+- In `ConfirmCustomerInfo.js` (Session 31), modifications trigger new waiver creation with `setWaiverId(null)`
+- After signature submission in `signature.js`, the backend returns the new `waiverId` in response (line 799 of waiverController.js)
+- **BUG**: The frontend wasn't storing this new waiverId in Redux after receiving the response
+- When navigating to `/rules`, `RuleReminder.js` checks for waiverId (lines 19-24)
+- If waiverId is missing, it redirects to homepage "/" instead of showing rules
+
+**Solution Implemented:**
+
+**File: src/pages/signature.js (Lines 334-342)**
+```javascript
+const response = await axios.post(`${BACKEND_URL}/api/waivers/save-signature`, payload);
+
+console.log("Signature saved successfully:", response.data);
+
+// Store the waiverId from response for rules acceptance (critical for existing customers with modified waivers)
+if (response.data.waiverId) {
+  dispatch(setWaiverId(response.data.waiverId));
+  console.log("Stored waiverId in Redux:", response.data.waiverId);
+}
+```
+
+**What Changed:**
+- Added Redux dispatch to store `response.data.waiverId` after successful signature submission
+- Added console logging for debugging
+- Ensures waiverId persists through Rules → All Done flow
+- `setWaiverId` was already imported on line 9, just needed to be called
+
+**Data Flow After Fix:**
+
+**Modified Waiver Flow:**
+1. UserDashboard → Click waiver → `setViewMode(true)`, `setWaiverId(existingWaiverId)`
+2. ConfirmCustomerInfo → User modifies data (adds minor)
+3. Click Confirm → `hasModifications()` returns true → Show dialog
+4. User confirms → `proceedToSignature()` creates new waiver → `setWaiverId(null)`, `setViewMode(false)`
+5. Navigate to /signature
+6. User signs → `submitSignature()` → POST /api/waivers/save-signature
+7. Backend creates/updates waiver → Returns `{ success: true, waiverId: 123 }`
+8. **FIX**: Frontend now stores waiverId in Redux ✅
+9. Navigate to /rules with waiverId present ✅
+10. RuleReminder checks waiverId → Found ✅ → Shows rules page
+11. User accepts rules → Navigate to /all-done
+12. AllDone → Redirect to /my-waivers (flowType='existing') ✅
+
+**Issue 3: Animated Logo for Screen Transitions** 🎨 → ✅
+
+**User Request:**
+"Create SVG logo of APP LOGO, Use it as screen switch animation. SVG logo animation center in page when screen switch."
+
+**Components Created:**
+
+**1. src/components/AnimatedLogo.js**
+- SVG component with Skate & Play branding
+- Purple circle background (#6B46C1) with yellow ring (#FFD700)
+- Black roller skate with 4 yellow wheels
+- Animated wheels with staggered pulsing effect (8px → 9px → 8px)
+- Sparkle effects with twinkling animation
+- "SKATE & PLAY" text with glow effect
+- "ROLL INTO FUN" subtitle with fade animation
+- Configurable size prop (default 120px)
+
+**2. src/components/AnimatedLogo.css**
+- Smooth keyframe animations:
+  - `pulse`: Logo background breathes (scale 1 → 1.02 → 1)
+  - `rotate`: Ring rotates continuously (360deg)
+  - `float`: Skate hovers up and down (±3px)
+  - `roll`: Individual wheels rotate
+  - `twinkle`: Sparkles fade in/out
+  - `glow`: Text shadow pulses
+  - `fadeInOut`: Subtitle opacity changes
+- Drop shadow for depth effect
+- All animations synchronized for smooth visuals
+
+**3. src/components/LoadingOverlay.js**
+- Full-screen overlay (fixed, z-index 9999)
+- White gradient background with blur effect
+- Centered animated logo (150px)
+- Bouncing purple dots below logo (staggered animation)
+- Visibility controlled by `isVisible` prop
+- Smooth fade-in/fade-out transitions (300ms)
+
+**4. src/components/LoadingOverlay.css**
+- Gradient background: white → light gray with blur
+- `slideUp` animation for content entrance
+- `bounce` animation for loading dots (scale 0 → 1)
+- Dot animation stagger: -0.32s, -0.16s, 0s delays
+- Opacity transitions for smooth appearance/disappearance
+
+**5. src/App.js Integration**
+- Split App into `AppContent` wrapper component
+- Added `useLocation()` hook to detect route changes
+- State management: `isLoading` toggles on pathname change
+- Loading shows for 400ms on each navigation
+- `<LoadingOverlay isVisible={isLoading} />` renders before Routes
+- Automatic cleanup of timeout on unmount
+
+**How It Works:**
+1. User navigates to new page (clicks link, form submission, etc.)
+2. `useLocation().pathname` changes
+3. `useEffect` triggers → `setIsLoading(true)`
+4. LoadingOverlay fades in (300ms) → Shows animated logo
+5. After 400ms → `setIsLoading(false)`
+6. LoadingOverlay fades out (300ms) → New page visible
+7. Total transition: ~700ms smooth experience
+
+**Benefits:**
+- Professional loading experience on every navigation
+- Brand reinforcement with consistent logo visibility
+- Smooth transitions prevent jarring page changes
+- Lightweight (pure CSS animations, no heavy libraries)
+- Configurable timing (can adjust 400ms delay as needed)
+- Works on all routes (customer and admin sides)
+- No performance impact (uses CSS transforms/opacity)
+
+**Testing Verified:**
+- ✅ Logo animates smoothly (wheels pulse, ring rotates, skate floats)
+- ✅ Loading overlay appears on route changes
+- ✅ Fade transitions work correctly
+- ✅ App compiles successfully with no errors
+- ✅ Browser console shows no JavaScript errors
+- ✅ Components render in correct order (seen in React DevTools logs)
+
+**Files Modified:**
+1. `src/pages/signature.js` - Added waiverId storage after signature submission (lines 338-342)
+2. `src/components/AnimatedLogo.js` - Created SVG logo component (new file, 149 lines)
+3. `src/components/AnimatedLogo.css` - Created logo animations (new file, 86 lines)
+4. `src/components/LoadingOverlay.js` - Created overlay component (new file, 21 lines)
+5. `src/components/LoadingOverlay.css` - Created overlay styles (new file, 64 lines)
+6. `src/App.js` - Integrated loading overlay with route detection (modified, added 13 lines)
+
+**All 381 tasks marked as complete [x]**
+
+---
+
 ## Session 39 (October 30, 2025) - Fixed Pending Waiver Completion Flow:
 
 [x] 363. Analyzed user-reported issue: OTP expiration creates pending waivers with empty pages

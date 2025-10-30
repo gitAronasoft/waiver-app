@@ -331,6 +331,12 @@ function Signature() {
       const response = await axios.post(`${BACKEND_URL}/api/waivers/save-signature`, payload);
       
       console.log("Signature saved successfully:", response.data);
+      
+      // Store the waiverId from response for rules acceptance (critical for existing customers with modified waivers)
+      if (response.data.waiverId) {
+        dispatch(setWaiverId(response.data.waiverId));
+        console.log("Stored waiverId in Redux:", response.data.waiverId);
+      }
  
       // Clear localStorage after signature submission for security
       localStorage.removeItem("signatureForm");

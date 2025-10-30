@@ -8,6 +8,8 @@ import DataTable from 'react-data-table-component';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import { BACKEND_URL } from '../../config';
+import { useSelector } from 'react-redux';
+import { selectCurrentStaff } from '../../store/slices/authSlice';
 
 const StaffList = () => {
   const [staff, setStaff] = useState([]);
@@ -19,19 +21,18 @@ const StaffList = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [currentUser] = useState(() => {
-    const staffData = localStorage.getItem('staff');
-    if (staffData) {
-      const user = JSON.parse(staffData);
-      console.log('Current user data:', user);
-      console.log('User role:', user.role);
-      console.log('Is superadmin?', user.role === 'superadmin');
-      return user;
-    }
-    return null;
-  });
+  
+  // Get current user from Redux store
+  const currentUser = useSelector(selectCurrentStaff);
 
   const navigate = useNavigate();
+
+  // Debug log to check user role
+  useEffect(() => {
+    console.log('Current user from Redux:', currentUser);
+    console.log('User role:', currentUser?.role);
+    console.log('Is superadmin?', currentUser?.role === 'superadmin');
+  }, [currentUser]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -43,9 +44,7 @@ const StaffList = () => {
     try {
       setLoading(true);
       const response = await axios.get(`${BACKEND_URL}/api/staff/getstaff`);
-      // Filter out superadmin users from the list
-      const filteredData = response.data.filter(s => s.role !== 'superadmin');
-      const sortedData = filteredData.sort((a, b) => b.id - a.id);
+      const sortedData = response.data.sort((a, b) => b.id - a.id);
       setStaff(sortedData);
       setFiltered(sortedData);
     } catch (err) {
