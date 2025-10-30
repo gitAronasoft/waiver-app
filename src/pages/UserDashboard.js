@@ -162,13 +162,13 @@ function UserDashboard() {
                               key={waiver.waiver_id} 
                               onClick={() => {
                                 dispatch(setWaiverId(waiver.waiver_id));
-                                dispatch(setViewMode(true)); // Set viewMode to true
+                                dispatch(setViewMode(false));
                                 navigate("/confirm-info", { 
                                   state: { 
                                     phone, 
                                     waiverId: waiver.waiver_id,
                                     isReturning: true,
-                                    viewOnly: true 
+                                    editToCreateNew: true 
                                   } 
                                 });
                               }}

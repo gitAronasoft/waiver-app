@@ -12,7 +12,8 @@ import {
   setWaiverId, 
   setCustomerData, 
   setMinors,
-  setCurrentStep 
+  setCurrentStep,
+  setViewMode 
 } from "../store/slices/waiverSessionSlice";
 
 function NewCustomerForm() {
@@ -234,6 +235,7 @@ function NewCustomerForm() {
       dispatch(setPhone(phoneNumber));
       dispatch(setCustomerId(userId));
       dispatch(setWaiverId(waiverId));
+      dispatch(setViewMode(false));
       dispatch(setCustomerData({
         first_name: formData.first_name,
         last_name: formData.last_name,

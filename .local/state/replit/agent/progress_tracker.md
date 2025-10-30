@@ -3,6 +3,101 @@
 [x] 3. Verify the project is working using the feedback tool
 [x] 4. Inform user the import is completed and they can start building, mark the import as completed using the complete_project_import tool
 
+## Session 34 (October 30, 2025) - Fixed Confirm Info Page Showing Wrong Waiver Data:
+
+[x] 324. Analyzed confirm-info page data flow for new and existing customer flows
+[x] 325. Identified issue: getCustomerInfoById endpoint returning ALL minors (inactive + active)
+[x] 326. Fixed backend endpoint to only return active minors (status = 1)
+[x] 327. Added setViewMode(false) to NewCustomerForm to prevent view mode during waiver creation
+[x] 328. Added setViewMode(false) and setFlowType('existing') to ExistingCustomerLogin
+[x] 329. Restarted Backend API workflow - Successfully running
+[x] 330. Verified React App compiled successfully with changes
+[x] 331. Updated progress tracker with Session 34 information
+
+### Session 34 Bug Fixed:
+
+**Bug: Confirm Info Page Shows Wrong Waiver Data for New and Existing Customers** ✅
+
+**User Requirements:**
+- Confirm info page should work correctly for both new and existing customers
+- Should show current waiver data, not historical minors from previous waivers
+
+**Problem Identified:**
+1. **Backend Issue**: `getCustomerInfoById` endpoint was returning ALL minors (both active and inactive) instead of only active minors
+2. **Frontend Issue**: `viewMode` flag was not being explicitly set to false when creating new waivers, causing potential state conflicts
+
+**Root Cause:**
+- When `ConfirmCustomerInfo` component loads, it chooses which API endpoint to call based on Redux state (waiverId, viewMode, customerId, phone)
+- For existing customers creating a new waiver, it would call `customer-info-by-id` endpoint
+- This endpoint returned ALL minors from the database (including deactivated ones from old waivers)
+- The `viewMode` flag might persist from previous sessions due to Redux persist
+
+**Solution Implemented:**
+
+**1. Backend Fix (backend/controllers/waiverController.js):**
+- **Line 321-328**: Updated `getCustomerInfoById` endpoint to filter minors by `status = 1`
+- Changed query from: `SELECT * FROM minors WHERE user_id = ?`
+- To: `SELECT * FROM minors WHERE user_id = ? AND status = 1`
+- This ensures only ACTIVE minors from the current waiver are returned
+- Matches the behavior of `getCustomerInfo` endpoint (phone-based lookup)
+
+**2. Frontend Fix - NewCustomerForm (src/pages/NewCustomerForm.js):**
+- **Line 12-20**: Added `setViewMode` import from Redux slice
+- **Line 241**: Added `dispatch(setViewMode(false))` after creating waiver
+- Ensures new waiver creation explicitly sets viewMode to false
+- Prevents any persisted viewMode=true from previous waiver views
+
+**3. Frontend Fix - ExistingCustomerLogin (src/pages/ExistingCustomerLogin.js):**
+- **Line 12**: Added `setViewMode` and `setFlowType` imports
+- **Line 126-127**: Added `dispatch(setFlowType('existing'))` and `dispatch(setViewMode(false))`
+- Ensures proper state initialization when existing customer logs in
+- Prevents view mode conflicts from previous sessions
+
+**Data Flow After Fix:**
+
+**ConfirmCustomerInfo Endpoint Selection Logic:**
+```javascript
+const endpoint = (waiverId && viewMode)
+  ? 'waiver-snapshot'      // Viewing historical waiver (UserDashboard click)
+  : customerId
+  ? 'customer-info-by-id'  // Creating new waiver as returning customer
+  : 'customer-info';       // Phone-based lookup
+```
+
+**New Customer Creating Waiver:**
+1. NewCustomerForm → creates waiver → sets Redux (phone, customerId, waiverId, viewMode=false)
+2. Navigate to /signature (not /confirm-info in normal flow)
+3. If user navigates to /confirm-info: uses customer-info-by-id endpoint
+4. Backend now returns only ACTIVE minors (status=1) ✅
+
+**Existing Customer Viewing Waiver:**
+1. UserDashboard → click waiver → sets Redux (waiverId, viewMode=true)
+2. Navigate to /confirm-info
+3. Uses waiver-snapshot endpoint (historical data) ✅
+4. Shows exact data as it was when waiver was signed ✅
+
+**Existing Customer Creating New Waiver:**
+1. ExistingCustomerLogin → sets Redux (phone, flowType='existing', viewMode=false)
+2. OTP verification → navigate to /my-waivers
+3. Click "New Waiver" → go through form
+4. If confirm-info is reached: uses customer-info-by-id with active minors only ✅
+
+**Benefits:**
+- Correct waiver data displayed for all customer flows
+- No historical minors appearing on new waiver creation
+- Consistent behavior between phone-based and ID-based lookups
+- Explicit viewMode state management prevents session conflicts
+- Maintains historical waiver integrity with snapshot endpoint
+
+**Files Modified:**
+1. `backend/controllers/waiverController.js` - Fixed getCustomerInfoById to filter active minors (line 325-327)
+2. `src/pages/NewCustomerForm.js` - Added setViewMode(false) on waiver creation (lines 12-20, 241)
+3. `src/pages/ExistingCustomerLogin.js` - Added setViewMode(false) and setFlowType on login (lines 12, 126-127)
+
+**All 331 tasks marked as complete [x]**
+
+---
+
 ## Session 33 (October 30, 2025) - Implemented Redux Toolkit State Management:
 
 [x] 301. Installed Redux packages (@reduxjs/toolkit, react-redux, redux-persist)

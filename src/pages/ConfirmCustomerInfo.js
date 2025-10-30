@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { BACKEND_URL } from "../config";
 import UserHeader from "../components/UserHeader";
-import { setCurrentStep } from "../store/slices/waiverSessionSlice";
+import { setCurrentStep, setCustomerData, setMinors, setWaiverId } from "../store/slices/waiverSessionSlice";
 
 function ConfirmCustomerInfo() {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ function ConfirmCustomerInfo() {
   const phone = useSelector((state) => state.waiverSession.phone);
   const customerId = useSelector((state) => state.waiverSession.customerId);
   const waiverId = useSelector((state) => state.waiverSession.waiverId);
-  const viewMode = useSelector((state) => state.waiverSession.viewMode);
+  const viewMode = useSelector((state) => state.waiverSession.progress.viewMode);
 
   const [formData, setFormData] = useState(null);
   const [originalData, setOriginalData] = useState(null);
@@ -37,10 +37,10 @@ function ConfirmCustomerInfo() {
       setLoading(true);
 
       // Determine which endpoint to use:
-      // - If waiverId exists and viewMode is true: use snapshot (viewing historical waiver)
+      // - If waiverId exists: use snapshot (could be viewing OR using as template for new waiver)
       // - If customerId exists: use customer-info-by-id (creating new waiver for returning customer)
       // - Otherwise: use phone-based lookup
-      const endpoint = (waiverId && viewMode)
+      const endpoint = waiverId
         ? `${BACKEND_URL}/api/waivers/waiver-snapshot?waiverId=${waiverId}`
         : customerId
         ? `${BACKEND_URL}/api/waivers/customer-info-by-id?customerId=${customerId}`
@@ -75,8 +75,8 @@ function ConfirmCustomerInfo() {
           data.can_email = data.can_email === 1 || data.can_email === "1";
           setFormData(data);
           
-          // Store original data for comparison only when viewing a waiver snapshot
-          if (waiverId && viewMode) {
+          // Store original data for comparison when loading a waiver (for "edit to create new" flow)
+          if (waiverId) {
             setOriginalData(JSON.parse(JSON.stringify(data)));
           }
 
@@ -86,13 +86,13 @@ function ConfirmCustomerInfo() {
               dob: minor.dob
                 ? new Date(minor.dob).toISOString().split("T")[0]
                 : "",
-              checked: (waiverId && viewMode) ? true : (minor.status === 1), // Always check minors when viewing waiver snapshot
+              checked: waiverId ? true : (minor.status === 1), // Check all minors when loading from waiver
               isNew: false,
             }));
             setMinorList(minorsWithFlags);
             
-            // Store original minors for comparison only when viewing a waiver snapshot
-            if (waiverId && viewMode) {
+            // Store original minors for comparison when loading a waiver
+            if (waiverId) {
               setOriginalMinors(JSON.parse(JSON.stringify(minorsWithFlags)));
             }
           }
@@ -214,8 +214,9 @@ function ConfirmCustomerInfo() {
 
   // Function to detect if any modifications were made
   const hasModifications = () => {
-    if (!waiverId || !viewMode || !originalData || !originalMinors) {
-      return false; // Not viewing a waiver snapshot, so no modification detection needed
+    // Only check modifications when we loaded from a waiver (editing to create new)
+    if (!waiverId || !originalData || !originalMinors) {
+      return false;
     }
 
     // Check for new minors added
@@ -243,6 +244,18 @@ function ConfirmCustomerInfo() {
       }
     }
 
+    // Check for changes in customer data
+    if (formData.first_name !== originalData.first_name ||
+        formData.last_name !== originalData.last_name ||
+        formData.email !== originalData.email ||
+        formData.dob !== originalData.dob ||
+        formData.address !== originalData.address ||
+        formData.city !== originalData.city ||
+        formData.province !== originalData.province ||
+        formData.postal_code !== originalData.postal_code) {
+      return true;
+    }
+
     return false;
   };
 
@@ -268,14 +281,14 @@ function ConfirmCustomerInfo() {
       return;
     }
 
-    // Check if viewing a waiver snapshot and modifications were made
-    if (waiverId && viewMode && hasModifications()) {
+    // Check if loading from a waiver (to create new) and modifications were made
+    if (waiverId && hasModifications()) {
       // Show confirmation dialog
       setShowConfirmDialog(true);
       return;
     }
 
-    // If no modifications or not viewing a waiver snapshot, proceed normally
+    // If no modifications or not loading from waiver, proceed normally
     proceedToSignature();
   };
 
@@ -297,8 +310,52 @@ function ConfirmCustomerInfo() {
       })),
     };
 
-    // Only update customer data if modifications were made
-    if (isModified) {
+    // If modifications were made and we're editing from a waiver, create a NEW waiver
+    if (isModified && waiverId) {
+      setUpdating(true);
+      try {
+        // Update customer data first
+        await axios.post(
+          `${BACKEND_URL}/api/waivers/update-customer`,
+          updatedData,
+        );
+        
+        // Create a new unsigned waiver by calling createWaiver
+        const createWaiverPayload = {
+          ...formData,
+          cell_phone: stripMask(formData.cell_phone),
+          home_phone: stripMask(formData.home_phone),
+          work_phone: stripMask(formData.work_phone),
+          minors: minorList
+            .filter(m => m.checked) // Only include checked minors
+            .map(m => ({
+              first_name: m.first_name,
+              last_name: m.last_name,
+              dob: m.dob,
+            })),
+          send_otp: false, // Don't send OTP for returning users
+        };
+        
+        const response = await axios.post(
+          `${BACKEND_URL}/api/waivers`,
+          createWaiverPayload,
+        );
+        
+        // Clear the old waiverId since we're creating a new one
+        // The backend will create a new unsigned waiver for this user
+        dispatch(setWaiverId(null));
+        
+        console.log("✅ Created new unsigned waiver for modified data");
+      } catch (err) {
+        console.error("Error creating new waiver:", err);
+        toast.error("Failed to create new waiver.");
+        setUpdating(false);
+        return;
+      } finally {
+        setUpdating(false);
+      }
+    } else if (isModified && !waiverId) {
+      // Just updating existing customer without creating new waiver
       setUpdating(true);
       try {
         await axios.post(
@@ -315,6 +372,9 @@ function ConfirmCustomerInfo() {
       }
     }
 
+    // Save customer data and minors to Redux so signature page can use them
+    dispatch(setCustomerData(updatedData));
+    dispatch(setMinors(updatedData.minors));
     dispatch(setCurrentStep('SIGNATURE'));
     navigate("/signature", { replace: true });
   };

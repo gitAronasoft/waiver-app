@@ -317,9 +317,10 @@ const getCustomerInfoById = async (req, res) => {
 
     const customer = customers[0];
 
-    // Get ALL minors for this customer (not just status = 1)
+    // Get only ACTIVE minors for this customer (status = 1)
+    // This ensures we show current waiver minors, not historical ones
     const [minors] = await db.query(
-      "SELECT * FROM minors WHERE user_id = ?",
+      "SELECT * FROM minors WHERE user_id = ? AND status = 1",
       [customer.id],
     );
 

@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import { useMask } from "@react-input/mask";
 import { countryCodes } from "../countryCodes";
 import { BACKEND_URL } from '../config';
-import { setPhone as setReduxPhone, setCurrentStep } from "../store/slices/waiverSessionSlice";
+import { setPhone as setReduxPhone, setCurrentStep, setViewMode, setFlowType } from "../store/slices/waiverSessionSlice";
 
 function ExistingCustomerLogin() {
   const [phone, setPhone] = useState("");
@@ -120,6 +120,8 @@ function ExistingCustomerLogin() {
       toast.success(res.data.message);
       
       dispatch(setReduxPhone(cleanPhone));
+      dispatch(setFlowType('existing'));
+      dispatch(setViewMode(false));
       dispatch(setCurrentStep('OTP_VERIFICATION'));
       navigate("/opt-verified");
     } catch (err) {

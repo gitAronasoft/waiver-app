@@ -31,6 +31,10 @@ function Signature() {
   const viewMode = useSelector((state) => state.waiverSession.progress.viewMode) || false;
   const createNewWaiver = useSelector((state) => state.waiverSession.progress.createNewWaiver) || false;
   const viewCompleted = useSelector((state) => state.waiverSession.progress.viewCompleted) || false;
+  
+  // Get customer data and minors from Redux (saved by ConfirmCustomerInfo page)
+  const reduxCustomerData = useSelector((state) => state.waiverSession.customerData);
+  const reduxMinors = useSelector((state) => state.waiverSession.minors);
 
   // Route protection: Redirect if accessed directly without valid state
   useEffect(() => {
@@ -49,28 +53,27 @@ function Signature() {
   });
 
 
-  // Fetch customer data and pre-fill signature for returning users
+  // Load customer data from Redux (data comes from ConfirmCustomerInfo page)
   useEffect(() => {
-    if (!phone) return;
+    if (!phone || !reduxCustomerData) return;
 
-    const fetchCustomer = async () => {
+    const loadCustomerData = async () => {
       setLoading(true);
       try {
-        const endpoint = `${BACKEND_URL}/api/waivers/getminors?phone=${phone}`;
-        const response = await axios.get(endpoint);
-        const data = response.data;
+        // Use Redux data instead of fetching from API
+        const data = reduxCustomerData;
         setCustomerData(data);
         setForm((prev) => ({
           ...prev,
           date: new Date().toISOString().split("T")[0],
           fullName: `${data.first_name} ${data.last_name}`,
-          minors: (data.minors || []).map((m) => ({
+          minors: (reduxMinors || []).map((m) => ({
             id: m.id,
             first_name: m.first_name,
             last_name: m.last_name,
             dob: m.dob ? new Date(m.dob).toISOString().split("T")[0] : "",
-            checked: m.status === 1,
-            isNew: false,
+            checked: m.checked !== undefined ? m.checked : (m.status === 1),
+            isNew: m.isNew || false,
           })),
         }));
 
@@ -105,15 +108,15 @@ function Signature() {
           }
         }
       } catch (error) {
-        console.error("Failed to fetch customer data:", error);
+        console.error("Failed to load customer data:", error);
         toast.error("Failed to load customer data.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCustomer();
-  }, [phone, isReturning, customerId, waiverId, viewMode, createNewWaiver]);
+    loadCustomerData();
+  }, [phone, reduxCustomerData, reduxMinors, isReturning, customerId, waiverId, viewMode, createNewWaiver]);
 
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
