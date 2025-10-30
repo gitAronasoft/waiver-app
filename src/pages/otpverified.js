@@ -1,18 +1,18 @@
 import React, { useState, useRef } from "react";
 import axios from "axios";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 import { toast } from 'react-toastify';
 import { BACKEND_URL } from '../config';
+import { setCurrentStep } from "../store/slices/waiverSessionSlice";
 
 function VerifyOtp() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const location = useLocation();
   const navigate = useNavigate();
-  const phone = location.state?.phone;
-  const customerType = location.state?.customerType || "existing";
-  const waiverId = location.state?.waiverId;
-  const userId = location.state?.userId;
+  const dispatch = useDispatch();
+  const phone = useSelector((state) => state.waiverSession.phone);
+  const flowType = useSelector((state) => state.waiverSession.flowType);
   const otpVerifiedRef = useRef(false);
 
   // console.log("OTP Verified:", customerType);
@@ -66,11 +66,12 @@ const verifyOtp = async (otpValue) => {
     if (res.data.authenticated) {
       toast.success("OTP Verified Successfully!");
 
-      if (customerType === "dashboard" || customerType === "existing") {
-        // Both existing customer and dashboard go to history dashboard
-        navigate("/my-waivers", { replace: true, state: { phone } });
-      } else if (customerType === "new") {
-        navigate("/signature", { replace: true, state: { phone, customerType, waiverId, userId } });
+      if (flowType === "existing") {
+        dispatch(setCurrentStep('DASHBOARD'));
+        navigate("/my-waivers", { replace: true });
+      } else if (flowType === "new") {
+        dispatch(setCurrentStep('SIGNATURE'));
+        navigate("/signature", { replace: true });
       }
     } else {
       toast.error("Invalid OTP. Please try again.");

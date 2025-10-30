@@ -1,42 +1,37 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 import Confetti from "react-confetti";
 import UserHeader from "../components/UserHeader";
+import { clearWaiverSession } from "../store/slices/waiverSessionSlice";
 
 
 function AllDone() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [countdown, setCountdown] = useState(5); // 5-second countdown
-  const completed = location.state?.completed;
-  const skipToMyWaivers = location.state?.skipToMyWaivers;
-  const phone = location.state?.phone;
-  const waiverId = location.state?.waiverId;
+  const dispatch = useDispatch();
+  const [countdown, setCountdown] = useState(5);
+  const phone = useSelector((state) => state.waiverSession.phone);
+  const flowType = useSelector((state) => state.waiverSession.flowType);
+  const currentStep = useSelector((state) => state.waiverSession.progress.currentStep);
+  const skipToMyWaivers = flowType === "existing";
 
   const handleReturn = () => {
-    // Clear all form data
-    localStorage.removeItem("signatureForm");
-    localStorage.removeItem("customerForm");
+    dispatch(clearWaiverSession());
     
-    // Redirect based on skipToMyWaivers flag
     if (skipToMyWaivers && phone) {
-      navigate("/my-waivers", { replace: true, state: { phone } });
+      navigate("/my-waivers", { replace: true });
     } else {
       navigate("/", { replace: true });
     }
   };
 
   useEffect(() => {
-    // Route protection: Only accessible if coming from valid flow
-    if (!completed && !skipToMyWaivers) {
+    // Route protection: Only accessible if coming from completed flow
+    if (currentStep !== 'COMPLETED') {
       console.warn("Direct access to AllDone page blocked, redirecting to home");
       navigate("/", { replace: true });
       return;
     }
-
-    // Clear form data when component mounts (but keep userFlow)
-    localStorage.removeItem("signatureForm");
-    localStorage.removeItem("customerForm");
     
     // Countdown timer
     const interval = setInterval(() => {
@@ -44,19 +39,13 @@ function AllDone() {
         if (prev === 1) {
           clearInterval(interval);
           
-          // Check userFlow to determine navigation
-          const userFlow = localStorage.getItem("userFlow");
+          dispatch(clearWaiverSession());
           
-          // Existing customers always go to dashboard after completion
-          if (userFlow === "existing" && phone) {
-            navigate("/my-waivers", { replace: true, state: { phone } });
-          } 
-          // New customers can optionally go to dashboard or home
-          else if (skipToMyWaivers && phone) {
-            navigate("/my-waivers", { replace: true, state: { phone } });
+          if (flowType === "existing" && phone) {
+            navigate("/my-waivers", { replace: true });
+          } else if (skipToMyWaivers && phone) {
+            navigate("/my-waivers", { replace: true });
           } else {
-            // Clear flow tracking when going back to home
-            localStorage.removeItem("userFlow");
             navigate("/", { replace: true });
           }
         }
@@ -65,7 +54,7 @@ function AllDone() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [navigate, completed, skipToMyWaivers, phone]);
+  }, [navigate, currentStep, skipToMyWaivers, phone, flowType, dispatch]);
 
   // Prevent browser back button navigation
   useEffect(() => {

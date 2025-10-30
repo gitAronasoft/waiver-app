@@ -1,13 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import { useMask } from "@react-input/mask";
 import { countryCodes } from "../countryCodes";
 import { BACKEND_URL } from "../config";
+import { 
+  setPhone, 
+  setCustomerId, 
+  setWaiverId, 
+  setCustomerData, 
+  setMinors,
+  setCurrentStep 
+} from "../store/slices/waiverSessionSlice";
 
 function NewCustomerForm() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [isChecked, setIsChecked] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
@@ -219,28 +229,32 @@ function NewCustomerForm() {
       const response = await axios.post(`${BACKEND_URL}/api/waivers`, fullData);
       const { waiverId, userId } = response.data;
       
-      // Preserve flow tracking
-      localStorage.setItem("userFlow", "new");
+      const phoneNumber = stripMask(formData.cell_phone);
+      
+      dispatch(setPhone(phoneNumber));
+      dispatch(setCustomerId(userId));
+      dispatch(setWaiverId(waiverId));
+      dispatch(setCustomerData({
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        dob: formData.dob,
+        address: formData.address,
+        city: formData.city,
+        province: formData.province,
+        postal_code: formData.postal_code,
+        cell_phone: phoneNumber,
+      }));
+      dispatch(setMinors(minorList.map(m => ({ ...m, status: 1, checked: true }))));
       
       if (isChecked) {
+        dispatch(setCurrentStep('OTP_VERIFICATION'));
         toast.success(`Customer created and OTP sent successfully.`);
-        navigate("/opt-verified", {
-          state: { 
-            phone: stripMask(formData.cell_phone), 
-            customerType: "new",
-            waiverId,
-            userId
-          },
-        });
+        navigate("/opt-verified");
       } else {
+        dispatch(setCurrentStep('SIGNATURE'));
         toast.success("Customer created successfully. Skipping OTP.");
-        navigate("/signature", {
-          state: { 
-            phone: stripMask(formData.cell_phone),
-            waiverId,
-            userId
-          },
-        });
+        navigate("/signature");
       }
     } catch (err) {
       if (err.response && err.response.data?.error) {

@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import { useMask } from "@react-input/mask";
 import { countryCodes } from "../countryCodes";
 import { BACKEND_URL } from '../config';
+import { setPhone as setReduxPhone, setCurrentStep } from "../store/slices/waiverSessionSlice";
 
 function ExistingCustomerLogin() {
   const [phone, setPhone] = useState("");
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
 
   const [countryCode, setCountryCode] = useState("+1");
@@ -115,9 +118,10 @@ function ExistingCustomerLogin() {
       const fullPhone = `${countryCode}${cleanPhone}`;   
       const res = await axios.post(`${BACKEND_URL}/api/auth/send-otp`, { cell_phone: fullPhone, phone: cleanPhone });
       toast.success(res.data.message);
-      // Preserve flow tracking in localStorage
-      localStorage.setItem("userFlow", "existing");
-      navigate("/opt-verified", { state: { phone: cleanPhone, customerType: "existing" } });
+      
+      dispatch(setReduxPhone(cleanPhone));
+      dispatch(setCurrentStep('OTP_VERIFICATION'));
+      navigate("/opt-verified");
     } catch (err) {
       toast.error(err?.response?.data?.message || "Error sending OTP. Please try again.");
     } finally {

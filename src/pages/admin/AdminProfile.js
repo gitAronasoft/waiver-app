@@ -1,10 +1,14 @@
 import React, { useState } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import Header from "./components/header";
 import { BACKEND_URL } from '../../config';
+import { updateStaff } from "../../store/slices/authSlice";
 
 function AdminProfile() {
-  const staff = JSON.parse(localStorage.getItem("staff")) || {};
+  const dispatch = useDispatch();
+  const staff = useSelector((state) => state.auth.staff) || {};
+  const token = useSelector((state) => state.auth.token);
 
   // Initialize admin state directly (no useEffect needed)
   const [admin, setAdmin] = useState({
@@ -65,7 +69,6 @@ function AdminProfile() {
         formData.append("profileImage", admin.profileImage);
       }
 
-      const token = localStorage.getItem("token");
       const response = await fetch(
         `${BACKEND_URL}/api/staff/update-profile`,
         {
@@ -82,27 +85,21 @@ function AdminProfile() {
       if (response.ok) {
         toast.success("Profile updated successfully!");
 
-        // Update localStorage with new staff data
         const updatedStaff = {
           ...staff,
           name: data.staff.name,
           email: data.staff.email,
           profile_image: data.staff.profile_image
         };
-        localStorage.setItem("staff", JSON.stringify(updatedStaff));
+        dispatch(updateStaff(updatedStaff));
 
-        // Update state properly
         setAdmin({
           name: data.staff.name,
           email: data.staff.email,
           profileImage: data.staff.profile_image
         });
 
-        // Clear preview since we now have the server image
         setPreview(null);
-
-        // Dispatch custom event to notify header to update
-        window.dispatchEvent(new Event('profileUpdated'));
       } else {
         toast.error(data.error || "Failed to update profile");
       }

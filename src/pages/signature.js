@@ -1,17 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 import SignaturePad from "react-signature-canvas";
 import axios from "axios";
 import { toast } from 'react-toastify';
 import { BACKEND_URL } from '../config';
 import UserHeader from '../components/UserHeader';
+import { setCurrentStep, setSignatureImage as setSignatureImageRedux } from "../store/slices/waiverSessionSlice";
 
 
 
 
 function Signature() {
-  const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const sigPadRef = useRef();
 
   const [signatureImage, setSignatureImage] = useState(null);
@@ -21,14 +23,14 @@ function Signature() {
   const [submitting, setSubmitting] = useState(false);
   const [minorErrors, setMinorErrors] = useState({});
 
-  const customerType = location.state?.customerType || "existing";
-  const phone = location.state?.phone;
-  const customerId = location.state?.customerId;
-  const isReturning = location.state?.isReturning || false;
-  const waiverId = location.state?.waiverId; // Get waiverId if viewing specific waiver
-  const viewMode = location.state?.viewMode || false; // View mode - no submission
-  const createNewWaiver = location.state?.createNewWaiver || false; // Creating new waiver from modified data
-  const viewCompleted = location.state?.viewCompleted || false; // Skip rules if already completed
+  const customerType = useSelector((state) => state.waiverSession.flowType) || "existing";
+  const phone = useSelector((state) => state.waiverSession.phone);
+  const customerId = useSelector((state) => state.waiverSession.customerId);
+  const isReturning = useSelector((state) => state.waiverSession.progress.isReturning) || false;
+  const waiverId = useSelector((state) => state.waiverSession.waiverId);
+  const viewMode = useSelector((state) => state.waiverSession.progress.viewMode) || false;
+  const createNewWaiver = useSelector((state) => state.waiverSession.progress.createNewWaiver) || false;
+  const viewCompleted = useSelector((state) => state.waiverSession.progress.viewCompleted) || false;
 
   // Route protection: Redirect if accessed directly without valid state
   useEffect(() => {
@@ -46,52 +48,6 @@ function Signature() {
     minors: [],
   });
 
-  // Utility to persist form data
-  const persistToLocalStorage = (updatedForm) => {
-    localStorage.setItem(
-      "signatureForm",
-      JSON.stringify({
-        form: updatedForm || form,
-        initials,
-        signatureImage,
-      })
-    );
-  };
-
-  // Load data from localStorage
-  useEffect(() => {
-    const savedData = localStorage.getItem("signatureForm");
-    if (savedData) {
-      const parsed = JSON.parse(savedData);
-      setForm(parsed.form);
-      setInitials(parsed.initials || "");
-      setSignatureImage(parsed.signatureImage || null);
-
-      if (parsed.signatureImage) {
-        // Wait for component to fully mount and signature pad to be ready
-        const restoreSignature = () => {
-          if (sigPadRef.current) {
-            try {
-              sigPadRef.current.fromDataURL(parsed.signatureImage);
-            } catch (error) {
-              console.error("Failed to restore signature:", error);
-            }
-          }
-        };
-        
-        // Try multiple times with increasing delays to ensure pad is ready
-        setTimeout(restoreSignature, 100);
-        setTimeout(restoreSignature, 500);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Save data to localStorage whenever form/signature changes
-  useEffect(() => {
-    persistToLocalStorage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, initials, signatureImage]);
 
   // Fetch customer data and pre-fill signature for returning users
   useEffect(() => {
@@ -100,49 +56,29 @@ function Signature() {
     const fetchCustomer = async () => {
       setLoading(true);
       try {
-        let data;
-        
-        // Always prioritize data from location.state if available
-        if (location.state?.formData) {
-          // Use data from confirm-info page
-          data = location.state.formData;
-          setCustomerData(data);
-          setForm((prev) => ({
-            ...prev,
-            date: new Date().toISOString().split("T")[0],
-            fullName: `${data.first_name} ${data.last_name}`,
-            minors: (data.minors || []).map((m) => ({
-              id: m.id,
-              first_name: m.first_name,
-              last_name: m.last_name,
-              dob: m.dob ? new Date(m.dob).toISOString().split("T")[0] : "",
-              checked: m.checked || m.status === 1,
-              isNew: m.isNew || false,
-            })),
-          }));
-        } else {
-          // Only fetch from API if no formData in state
-          const endpoint = `${BACKEND_URL}/api/waivers/getminors?phone=${phone}`;
-          const response = await axios.get(endpoint);
-          data = response.data;
-          setCustomerData(data);
-          setForm((prev) => ({
-            ...prev,
-            date: new Date().toISOString().split("T")[0],
-            fullName: `${data.first_name} ${data.last_name}`,
-            minors: (data.minors || []).map((m) => ({
-              id: m.id,
-              first_name: m.first_name,
-              last_name: m.last_name,
-              dob: m.dob ? new Date(m.dob).toISOString().split("T")[0] : "",
-              checked: m.status === 1,
-              isNew: false,
-            })),
-          }));
-        }
+        const endpoint = `${BACKEND_URL}/api/waivers/getminors?phone=${phone}`;
+        const response = await axios.get(endpoint);
+        const data = response.data;
+        setCustomerData(data);
+        setForm((prev) => ({
+          ...prev,
+          date: new Date().toISOString().split("T")[0],
+          fullName: `${data.first_name} ${data.last_name}`,
+          minors: (data.minors || []).map((m) => ({
+            id: m.id,
+            first_name: m.first_name,
+            last_name: m.last_name,
+            dob: m.dob ? new Date(m.dob).toISOString().split("T")[0] : "",
+            checked: m.status === 1,
+            isNew: false,
+          })),
+        }));
 
-        // Pre-fill signature from specific waiver or most recent
-        if (waiverId || (isReturning && customerId)) {
+        // Only pre-fill signature when viewing a specific waiver OR when NOT creating a new waiver
+        // For new waiver flow (createNewWaiver=true), don't pre-fill signature
+        const shouldPreFillSignature = waiverId || (viewMode && !createNewWaiver);
+        
+        if (shouldPreFillSignature && (waiverId || customerId)) {
           try {
             const signatureResponse = waiverId
               ? await axios.get(`${BACKEND_URL}/api/waivers/get-signature?waiverId=${waiverId}`)
@@ -177,7 +113,7 @@ function Signature() {
     };
 
     fetchCustomer();
-  }, [phone, isReturning, customerId, location.state?.formData]);
+  }, [phone, isReturning, customerId, waiverId, viewMode, createNewWaiver]);
 
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
@@ -186,7 +122,6 @@ function Signature() {
       [name]: type === "checkbox" ? checked : value,
     };
     setForm(updated);
-    persistToLocalStorage(updated);
   };
 
   const handleMinorChange = (index, field, value) => {
@@ -194,7 +129,6 @@ function Signature() {
     minors[index][field] = value;
     const updated = { ...form, minors };
     setForm(updated);
-    persistToLocalStorage(updated);
     
     // Clear error for this field when user types
     const errorKey = `${index}_${field}`;
@@ -214,7 +148,6 @@ function Signature() {
       ],
     };
     setForm(updated);
-    persistToLocalStorage(updated);
   };
 
   const handleRemoveMinor = (index) => {
@@ -222,7 +155,6 @@ function Signature() {
     minors.splice(index, 1);
     const updated = { ...form, minors };
     setForm(updated);
-    persistToLocalStorage(updated);
     
     // Clear errors for removed minor and rebuild error keys for remaining minors
     const newErrors = {};
@@ -245,27 +177,19 @@ function Signature() {
   const handleClearSignature = () => {
     sigPadRef.current.clear();
     setSignatureImage(null);
-    persistToLocalStorage();
   };
 
   const handleSubmit = async () => {
     // If viewing a completed waiver, redirect directly to My Waivers
     if (viewCompleted) {
-      navigate("/my-waivers", {
-        replace: true,
-        state: {
-          phone,
-        },
-      });
+      navigate("/my-waivers", { replace: true });
       return;
     }
 
     // If in view mode, just navigate to rules without submitting
     if (viewMode) {
-      navigate("/rules", {
-        replace: true,
-        state: { userId: customerData?.id, phone, customerType, waiverId },
-      });
+      dispatch(setCurrentStep('RULE_REMINDER'));
+      navigate("/rules", { replace: true });
       return;
     }
 
@@ -361,6 +285,7 @@ function Signature() {
     const signatureData = canvas.toDataURL("image/jpeg", 0.6); // compressed JPEG with white background
 
     setSignatureImage(signatureData);
+    dispatch(setSignatureImageRedux(signatureData));
 
     const payload = {
       id: customerData?.id,
@@ -381,10 +306,8 @@ function Signature() {
       localStorage.removeItem("signatureForm");
       
       toast.success("Signature submitted sucessfully.");
-      navigate("/rules", {
-        replace: true,
-        state: { userId: customerData?.id, phone, customerType, waiverId },
-      });
+      dispatch(setCurrentStep('RULE_REMINDER'));
+      navigate("/rules", { replace: true });
     } catch (error) {
       console.error(error);
       toast.error("Failed to save signature.");
@@ -420,17 +343,9 @@ function formatPhone(phone = "") {
     localStorage.removeItem("signatureForm");
     
     if (customerType === "new") {
-      navigate("/verify-otp", { state: { phone, customerType } });
+      navigate("/verify-otp", { replace: true });
     } else {
-      navigate("/confirm-info", { 
-        state: { 
-          phone, 
-          customerType,
-          customerId,
-          isReturning,
-          waiverId // Preserve waiverId when going back
-        } 
-      });
+      navigate("/confirm-info", { replace: true });
     }
   };
 

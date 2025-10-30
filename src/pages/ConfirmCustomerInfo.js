@@ -1,24 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { BACKEND_URL } from "../config";
 import UserHeader from "../components/UserHeader";
+import { setCurrentStep } from "../store/slices/waiverSessionSlice";
 
 function ConfirmCustomerInfo() {
-  const location = useLocation();
   const navigate = useNavigate();
-  const phone = location.state?.phone;
-  const customerId = location.state?.customerId;
-  const waiverId = location.state?.waiverId;
-  const viewOnly = location.state?.viewOnly || false;
-  const isReturning = location.state?.isReturning || false;
+  const dispatch = useDispatch();
+  const phone = useSelector((state) => state.waiverSession.phone);
+  const customerId = useSelector((state) => state.waiverSession.customerId);
+  const waiverId = useSelector((state) => state.waiverSession.waiverId);
+  const viewMode = useSelector((state) => state.waiverSession.viewMode);
 
   const [formData, setFormData] = useState(null);
   const [originalData, setOriginalData] = useState(null);
   const [originalMinors, setOriginalMinors] = useState([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [waiverInfo, setWaiverInfo] = useState(null);
 
   // Route protection: Redirect if accessed directly without valid state
   useEffect(() => {
@@ -33,15 +33,20 @@ function ConfirmCustomerInfo() {
   const [minorErrors, setMinorErrors] = useState({});
 
   useEffect(() => {
-    if (phone || waiverId) {
+    if (phone || waiverId || customerId) {
       setLoading(true);
 
-      // If viewing a specific waiver, use snapshot endpoint
-      const endpoint = waiverId
+      // Determine which endpoint to use:
+      // - If waiverId exists and viewMode is true: use snapshot (viewing historical waiver)
+      // - If customerId exists: use customer-info-by-id (creating new waiver for returning customer)
+      // - Otherwise: use phone-based lookup
+      const endpoint = (waiverId && viewMode)
         ? `${BACKEND_URL}/api/waivers/waiver-snapshot?waiverId=${waiverId}`
         : customerId
         ? `${BACKEND_URL}/api/waivers/customer-info-by-id?customerId=${customerId}`
         : `${BACKEND_URL}/api/waivers/customer-info?phone=${phone}`;
+
+      console.log(`📊 Fetching data from: ${endpoint}`, { waiverId, viewMode, customerId, phone });
 
       axios
         .get(endpoint)
@@ -70,13 +75,8 @@ function ConfirmCustomerInfo() {
           data.can_email = data.can_email === 1 || data.can_email === "1";
           setFormData(data);
           
-          // Store waiver info (rules_accepted, completed) when viewing a waiver
-          if (waiverId && res.data.waiver) {
-            setWaiverInfo(res.data.waiver);
-          }
-          
-          // Store original data for comparison when viewing a waiver
-          if (waiverId) {
+          // Store original data for comparison only when viewing a waiver snapshot
+          if (waiverId && viewMode) {
             setOriginalData(JSON.parse(JSON.stringify(data)));
           }
 
@@ -86,13 +86,13 @@ function ConfirmCustomerInfo() {
               dob: minor.dob
                 ? new Date(minor.dob).toISOString().split("T")[0]
                 : "",
-              checked: waiverId ? true : (minor.status === 1), // Always check minors when viewing waiver
+              checked: (waiverId && viewMode) ? true : (minor.status === 1), // Always check minors when viewing waiver snapshot
               isNew: false,
             }));
             setMinorList(minorsWithFlags);
             
-            // Store original minors for comparison when viewing a waiver
-            if (waiverId) {
+            // Store original minors for comparison only when viewing a waiver snapshot
+            if (waiverId && viewMode) {
               setOriginalMinors(JSON.parse(JSON.stringify(minorsWithFlags)));
             }
           }
@@ -107,7 +107,7 @@ function ConfirmCustomerInfo() {
           setLoading(false);
         });
     }
-  }, [phone, customerId, waiverId]);
+  }, [phone, customerId, waiverId, viewMode]);
 
   // const handleChange = (e) => {
   //   const { name, value, type } = e.target;
@@ -214,8 +214,8 @@ function ConfirmCustomerInfo() {
 
   // Function to detect if any modifications were made
   const hasModifications = () => {
-    if (!waiverId || !originalData || !originalMinors) {
-      return false; // Not viewing a waiver, so no modification detection needed
+    if (!waiverId || !viewMode || !originalData || !originalMinors) {
+      return false; // Not viewing a waiver snapshot, so no modification detection needed
     }
 
     // Check for new minors added
@@ -268,14 +268,14 @@ function ConfirmCustomerInfo() {
       return;
     }
 
-    // Check if viewing a waiver and modifications were made
-    if (waiverId && hasModifications()) {
+    // Check if viewing a waiver snapshot and modifications were made
+    if (waiverId && viewMode && hasModifications()) {
       // Show confirmation dialog
       setShowConfirmDialog(true);
       return;
     }
 
-    // If no modifications or not viewing a waiver, proceed normally
+    // If no modifications or not viewing a waiver snapshot, proceed normally
     proceedToSignature();
   };
 
@@ -315,21 +315,8 @@ function ConfirmCustomerInfo() {
       }
     }
 
-    // Always navigate to signature page
-    // Pass viewCompleted flag to skip rules if waiver is already completed
-    navigate("/signature", {
-      replace: true,
-      state: {
-        phone,
-        formData: updatedData,
-        customerId: formData.id,
-        isReturning,
-        waiverId: isModified ? null : waiverId, // Clear waiverId if modified to create new waiver
-        createNewWaiver: isModified, // Flag to indicate this should create a new waiver
-        viewMode: !isModified && waiverId, // View mode if viewing without modifications
-        viewCompleted: !isModified && waiverId && waiverInfo?.rules_accepted === 1, // Skip rules if completed
-      },
-    });
+    dispatch(setCurrentStep('SIGNATURE'));
+    navigate("/signature", { replace: true });
   };
   if (loading || !formData) {
     return <div className="text-center mt-5">Loading customer info...</div>;

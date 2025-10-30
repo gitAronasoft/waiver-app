@@ -1,9 +1,10 @@
 // components/AdminPrivateRoute.js
 import React from "react";
 import { Navigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 function AdminPrivateRoute({ children }) {
-  const token = localStorage.getItem("token");
+  const token = useSelector((state) => state.auth.token);
 
   if (!token) {
     // Not logged in — redirect to login page

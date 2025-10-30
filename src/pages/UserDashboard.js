@@ -1,23 +1,26 @@
 import React, { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 import axios from "axios";
 import { toast } from "react-toastify";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { BACKEND_URL } from '../config';
 import UserHeader from '../components/UserHeader';
+import { clearWaiverSession } from "../store/slices/waiverSessionSlice";
+import { setPhone as setReduxPhone, setWaiverId, setCustomerId, setViewMode } from "../store/slices/waiverSessionSlice";
 
 function UserDashboard() {
-  const location = useLocation();
   const navigate = useNavigate();
-  const phone = location.state?.phone;
+  const dispatch = useDispatch();
+  const phone = useSelector((state) => state.waiverSession.phone);
   const [waivers, setWaivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isVerified, setIsVerified] = useState(true);
 
   useEffect(() => {
     if (!phone) {
-      console.warn("No phone found in state, redirecting to home");
+      console.warn("No phone found in Redux, redirecting to home");
       navigate("/", { replace: true });
       return;
     }
@@ -50,18 +53,6 @@ function UserDashboard() {
     } else {
       return <span className="badge custom-badge-pending">Pending</span>;
     }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   const formatPhone = (phoneNum) => {
@@ -169,14 +160,18 @@ function UserDashboard() {
                           return (
                             <tr 
                               key={waiver.waiver_id} 
-                              onClick={() => navigate("/confirm-info", { 
-                                state: { 
-                                  phone, 
-                                  waiverId: waiver.waiver_id,
-                                  isReturning: true,
-                                  viewOnly: true
-                                } 
-                              })}
+                              onClick={() => {
+                                dispatch(setWaiverId(waiver.waiver_id));
+                                dispatch(setViewMode(true)); // Set viewMode to true
+                                navigate("/confirm-info", { 
+                                  state: { 
+                                    phone, 
+                                    waiverId: waiver.waiver_id,
+                                    isReturning: true,
+                                    viewOnly: true 
+                                  } 
+                                });
+                              }}
                               style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}
                               className="waiver-row"
                             >
@@ -227,7 +222,7 @@ function UserDashboard() {
                 <div className="text-center mt-4 mb-3">
                   <button 
                     onClick={() => {
-                      // Clear all flow tracking and session data
+                      dispatch(clearWaiverSession());
                       localStorage.removeItem("userFlow");
                       localStorage.removeItem("signatureForm");
                       localStorage.removeItem("customerForm");

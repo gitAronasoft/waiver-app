@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { BACKEND_URL } from '../../config';
+import { login } from "../../store/slices/authSlice";
 
 function LoginPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -45,9 +48,7 @@ function LoginPage() {
       toast.success(response.data.message);
       console.log("Logged in staff:", response.data.staff);
 
-      // Save token and staff info
-      localStorage.setItem("token", response.data.token);
-      localStorage.setItem("staff", JSON.stringify(response.data.staff));
+      dispatch(login({ token: response.data.token, staff: response.data.staff }));
 
       navigate("/admin/home");
     } catch (err) {

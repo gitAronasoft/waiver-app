@@ -1,18 +1,21 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { setFlowType, clearWaiverSession } from "../store/slices/waiverSessionSlice";
 
 export default function Index() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const handleStart = (type) => {
+    dispatch(clearWaiverSession());
+    
     if (type === "existing") {
-      // Set flow identifier for existing customer
-      localStorage.setItem("userFlow", "existing");
-      navigate("/existing-customer", { state: { customerType: "dashboard" } });
+      dispatch(setFlowType("existing"));
+      navigate("/existing-customer");
     } else {
-      // Set flow identifier for new customer
-      localStorage.setItem("userFlow", "new");
-      navigate("/new-customer", { state: { customerType: "new" } });
+      dispatch(setFlowType("new"));
+      navigate("/new-customer");
     }
   };
 

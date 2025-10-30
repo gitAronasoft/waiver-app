@@ -1,22 +1,24 @@
 import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { BACKEND_URL } from "../config";
 import UserHeader from "../components/UserHeader";
+import { setCurrentStep } from "../store/slices/waiverSessionSlice";
 
 function RuleReminder() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const userId = location.state?.userId;
-  const phone = location.state?.phone;
-  const waiverId = location.state?.waiverId;
+  const dispatch = useDispatch();
+  const userId = useSelector((state) => state.waiverSession.customerId);
+  const phone = useSelector((state) => state.waiverSession.phone);
+  const waiverId = useSelector((state) => state.waiverSession.waiverId);
   const [loading, setLoading] = useState(false);
 
   // Route protection: Redirect if accessed directly without valid state
   React.useEffect(() => {
     if (!userId || !phone) {
-      console.warn("No userId or phone found in state, redirecting to home");
+      console.warn("No userId or phone found in Redux, redirecting to home");
       navigate("/", { replace: true });
     }
   }, [userId, phone, navigate]);
@@ -42,9 +44,9 @@ function RuleReminder() {
     setLoading(true);
     try {
       await axios.post(`${BACKEND_URL}/api/waivers/accept-rules`, { userId, waiverId });
-      localStorage.removeItem("signatureForm"); // Clear saved signature and form data
+      dispatch(setCurrentStep('COMPLETED'));
       toast.success("Rules accepted!");
-      navigate("/all-done", { replace: true, state: { completed: true, waiverId, phone } });
+      navigate("/all-done", { replace: true });
     } catch (error) {
       console.error(error);
       toast.error("Failed to update waiver status.");

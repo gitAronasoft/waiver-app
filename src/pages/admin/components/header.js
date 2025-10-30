@@ -1,28 +1,20 @@
 import React, { useRef } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 import { BACKEND_URL } from '../../../config';
+import { logout } from "../../../store/slices/authSlice";
 
 function Header() {
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const currentPath = location.pathname;
 
-  const [staff, setStaff] = React.useState(JSON.parse(localStorage.getItem("staff")));
-  const dropdownRef = useRef(null); // Reference for dropdown
-
-  // Listen for profile updates
-  React.useEffect(() => {
-    const handleProfileUpdate = () => {
-      setStaff(JSON.parse(localStorage.getItem("staff")));
-    };
-
-    window.addEventListener('profileUpdated', handleProfileUpdate);
-    return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
-  }, []);
+  const staff = useSelector((state) => state.auth.staff);
+  const dropdownRef = useRef(null);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("staff");
+    dispatch(logout());
     navigate("/admin/login");
   };
 
