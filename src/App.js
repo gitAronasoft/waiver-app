@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Index from "./pages/firstsetp";
 import NewCustomerForm from "./pages/NewCustomerForm";
 import ExistingCustomerLogin from "./pages/ExistingCustomerLogin";
-import Optverified from "./pages/otpverified";
+import OtpVerified from "./pages/otpverified";
 import ConfirmCustomerInfo from "./pages/ConfirmCustomerInfo";
 import RuleReminder from "./pages/RuleReminder";
 import Signature from "./pages/signature";
@@ -123,7 +123,7 @@ function App() {
         <Route path="/" element={<Index />} />
         <Route path="/new-customer" element={<NewCustomerForm />} />
         <Route path="/existing-customer" element={<ExistingCustomerLogin />} />
-        <Route path="/opt-verified" element={<Optverified />} />
+        <Route path="/otp-verified" element={<OtpVerified />} />
         <Route path="/confirm-info" element={<ConfirmCustomerInfo />} />
         <Route path="/signature" element={<Signature />} />
         <Route path="/rules" element={<RuleReminder />} />

@@ -252,7 +252,7 @@ function NewCustomerForm() {
       if (isChecked) {
         dispatch(setCurrentStep('OTP_VERIFICATION'));
         toast.success("Your information has been saved. Please check your phone for the verification code.");
-        navigate("/opt-verified");
+        navigate("/otp-verified");
       } else {
         dispatch(setCurrentStep('SIGNATURE'));
         toast.success("Your information has been saved successfully.");
@@ -275,14 +275,13 @@ function NewCustomerForm() {
       <div className="container text-center">
         <div className="row align-items-center">
           <div className="col-md-2">
-            <div className="back-btn">
+            <div className="back-btn" style={{'margin-top': '0px'}}>
               <Link to="/">
                 <img
                   className="img-fluid"
                   src="/assets/img/image 298.png"
                   alt="back-icon"
-                />{" "}
-                BACK
+                />&nbsp;Back
               </Link>
             </div>
           </div>

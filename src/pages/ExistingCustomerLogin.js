@@ -123,7 +123,7 @@ function ExistingCustomerLogin() {
       dispatch(setFlowType('existing'));
       dispatch(setViewMode(false));
       dispatch(setCurrentStep('OTP_VERIFICATION'));
-      navigate("/opt-verified");
+      navigate("/otp-verified");
     } catch (err) {
       toast.error(err?.response?.data?.message || "We couldn't send the verification code. Please check your phone number and try again.");
     } finally {
@@ -136,14 +136,13 @@ function ExistingCustomerLogin() {
       <div className="container text-center">
         <div className="row">
           <div className="col-md-2">
-            <div className="back-btn" style={{ 'margin-top': '70px'}}>
+            <div className="back-btn" style={{ 'margin-top': '50px'}}>
               <Link to="/">
                 <img
                   className="img-fluid"
                   src="/assets/img/image 298.png"
                   alt="back"
-                />{" "}
-                Back
+                />&nbsp;Back
               </Link>
             </div>
           </div>
@@ -163,20 +162,7 @@ function ExistingCustomerLogin() {
               </div>
               <h5 className="bold">Please enter your phone number</h5>
               <p className="bold mb-3">A text message will be sent to you for verification</p>
-              {loading && <p className="text-center text-primary">Sending OTP...</p>}
-
-              {/* <div className="pin-inputs d-flex justify-content-center gap-3">
-                <input
-                  ref={phoneRef}
-                  type="text"
-                  className="pin-box mobile-number"
-                  value={phone}
-                  onChange={(e) => {
-                    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
-                    formatPhone(digits);
-                  }}
-                />
-              </div> */}
+              {loading && <p className="text-center text-primary">Sending OTP...</p>} 
 
               <div className="pin-inputs d-flex justify-content-center align-items-center flex-wrap">
                 <div className="custom-dropdown" style={{ position: "relative" }} ref={dropdownRef}>
@@ -194,7 +180,8 @@ function ExistingCustomerLogin() {
                       borderBottomLeftRadius: "8px",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center"
+                      justifyContent: "center",
+                      backgroundColor: "#f8f2e5"                      
                     }}
                   >
                     {countryCode}

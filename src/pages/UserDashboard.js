@@ -64,285 +64,289 @@ function UserDashboard() {
   return (
     <>
       <style>{`
-        .waiver-card {
+        .user-dashboard-container {
+          min-height: 100vh;
+          background: #f5f5f5;
+          padding: 40px 20px;
+        }
+        
+        .dashboard-header-section {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        
+        .dashboard-header-section h1 {
+          font-size: 1.75rem;
+          font-weight: 600;
+          color: #1a1a1a;
+          margin-bottom: 8px;
+        }
+        
+        .dashboard-header-section .phone-number {
+          font-size: 0.95rem;
+          color: #666;
+          margin-bottom: 4px;
+        }
+        
+        .dashboard-header-section .visits-count {
+          font-size: 0.9rem;
+          color: #6366f1;
+          font-weight: 500;
+        }
+        
+        .professional-table-wrapper {
           background: #fff;
-          border-radius: 20px;
-          box-shadow: 0px 4px 30px rgba(0, 0, 0, 0.06);
-          border-bottom: 3px solid #DCC07C;
-          transition: all 0.3s ease;
-          cursor: pointer;
+          border-radius: 12px;
           overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
-        .waiver-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0px 8px 40px rgba(0, 0, 0, 0.12);
-          border-bottom-color: #6C5CE7;
+        
+        .professional-table {
+          width: 100%;
+          margin: 0;
+          border-collapse: separate;
+          border-spacing: 0;
         }
-        .waiver-card-header {
-          background: linear-gradient(135deg, #6C5CE7 0%, #8B7FE8 100%);
-          padding: 15px 20px;
-          color: white;
+        
+        .professional-table thead {
+          background: #f8f9fa;
         }
-        .waiver-card-body {
-          padding: 20px;
+        
+        .professional-table thead th {
+          padding: 16px 20px;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #1a1a1a;
+          text-align: left;
+          border-bottom: 2px solid #6366f1;
+          white-space: nowrap;
         }
-        .info-row {
-          display: flex;
-          align-items: center;
-          padding: 10px 0;
-          border-bottom: 1px solid #f0f0f0;
+        
+        .professional-table tbody tr {
+          border-bottom: 1px solid #e5e7eb;
+          transition: background-color 0.2s;
+          cursor: pointer;
         }
-        .info-row:last-child {
+        
+        .professional-table tbody tr:hover {
+          background-color: #f9fafb;
+        }
+        
+        .professional-table tbody tr:last-child {
           border-bottom: none;
         }
-        .info-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-right: 15px;
-          font-size: 18px;
+        
+        .professional-table tbody td {
+          padding: 18px 20px;
+          font-size: 0.9rem;
+          color: #4b5563;
+          vertical-align: middle;
         }
+        
+        .waiver-id-cell {
+          color: #6366f1;
+          font-weight: 600;
+          font-size: 0.95rem;
+        }
+        
+        .name-cell {
+          font-weight: 500;
+          color: #1a1a1a;
+        }
+        
+        .email-cell {
+          color: #6b7280;
+          font-size: 0.875rem;
+        }
+        
+        .date-cell {
+          color: #4b5563;
+          font-size: 0.875rem;
+        }
+        
+        .minors-badge {
+          background: #fef3c7;
+          color: #92400e;
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          display: inline-block;
+        }
+        
         .badge-pending {
           background-color: #FFD93D;
           color: #000;
           font-weight: 600;
           padding: 6px 14px;
-          border-radius: 20px;
-          font-size: 0.85rem;
+          border-radius: 12px;
+          font-size: 0.8rem;
+          display: inline-block;
         }
+        
         .badge-verified {
-          background-color: #6C5CE7;
+          background-color: #10b981;
           color: #fff;
           font-weight: 600;
           padding: 6px 14px;
-          border-radius: 20px;
-          font-size: 0.85rem;
+          border-radius: 12px;
+          font-size: 0.8rem;
+          display: inline-block;
         }
+        
         .badge-inaccurate {
-          background-color: #FF6B6B;
+          background-color: #ef4444;
           color: #fff;
           font-weight: 600;
           padding: 6px 14px;
-          border-radius: 20px;
-          font-size: 0.85rem;
+          border-radius: 12px;
+          font-size: 0.8rem;
+          display: inline-block;
         }
-        .dashboard-header {
-          background: linear-gradient(135deg, #6C5CE7 0%, #8B7FE8 100%);
-          padding: 30px 20px;
-          border-radius: 20px;
-          color: white;
-          margin-bottom: 30px;
-          box-shadow: 0px 4px 20px rgba(108, 92, 231, 0.3);
-        }
+        
         @media (max-width: 768px) {
-          .waiver-card {
-            margin-bottom: 15px;
+          .professional-table thead th,
+          .professional-table tbody td {
+            padding: 12px 10px;
+            font-size: 0.8rem;
+          }
+          
+          .dashboard-header-section h1 {
+            font-size: 1.5rem;
           }
         }
       `}</style>
       <UserHeader showLogout={true} onLogout={handleLogout} />
-      <div className="container-fluid" style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%)' }}>
-        <div className="container py-4">
+      <div className="user-dashboard-container">
+        <div className="container" style={{ maxWidth: '1200px' }}>
           
           {/* Header Section */}
-          <div className="dashboard-header">
-            <div className="row align-items-center">
-              <div className="col-md-8">
-                <h2 className="mb-2" style={{ fontSize: '1.8rem', fontWeight: '700' }}>My Visit History</h2>
-                <p className="mb-0" style={{ fontSize: '1rem', opacity: 0.9 }}>
-                  <i className="fas fa-phone me-2"></i>
-                  {formatPhone(phone)}
-                </p>
-              </div>
-              <div className="col-md-4 text-md-end mt-3 mt-md-0">
-                {waivers.length > 0 && (
-                  <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '15px', borderRadius: '15px', backdropFilter: 'blur(10px)' }}>
-                    <h3 className="mb-0" style={{ fontSize: '2rem', fontWeight: '700' }}>{waivers.length}</h3>
-                    <p className="mb-0" style={{ fontSize: '0.9rem', opacity: 0.9 }}>Total Visit{waivers.length !== 1 ? 's' : ''}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-            {!isVerified && waivers.length > 0 && (
-              <div className="mt-3 p-3" style={{ background: 'rgba(255, 217, 61, 0.2)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.3)' }}>
-                <i className="fas fa-info-circle me-2"></i>
-                <strong>Note:</strong> Pending verification - Complete visit history will be available after phone verification.
-              </div>
+          <div className="dashboard-header-section">
+            <h1>My Visit History</h1>
+            <p className="phone-number">Phone: {formatPhone(phone)}</p>
+            {waivers.length > 0 && (
+              <p className="visits-count">{waivers.length} visit{waivers.length !== 1 ? 's' : ''} found</p>
             )}
           </div>
 
           {/* Content Section */}
-          <div className="row">
-            <div className="col-12">
-              {loading ? (
-                <div className="row">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="col-12 col-md-6 col-lg-4 mb-4">
-                      <div className="waiver-card">
-                        <Skeleton height={60} />
-                        <div className="p-3">
-                          <Skeleton height={30} count={3} className="mb-2" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : waivers.length === 0 ? (
-                <div className="text-center mt-5 py-5">
-                  <div 
-                    style={{ 
-                      width: '120px', 
-                      height: '120px', 
-                      margin: '0 auto 30px',
-                      background: 'linear-gradient(135deg, #6C5CE7 0%, #8B7FE8 100%)',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: 0.15
-                    }}
-                  >
-                    <i className="fas fa-file-signature" style={{ fontSize: '60px', color: 'white' }}></i>
-                  </div>
-                  <h4 className="mb-3" style={{ fontWeight: '700', color: '#495057' }}>No Visits Yet</h4>
-                  <p className="text-muted mb-4" style={{ fontSize: '1rem', maxWidth: '400px', margin: '0 auto 30px' }}>
-                    Start your skating journey today! Sign your first waiver to get started.
-                  </p>
-                  <Link 
-                    to="/new-customer" 
-                    className="btn"
-                    style={{
-                      backgroundColor: '#6C5CE7',
-                      color: 'white',
-                      padding: '14px 35px',
-                      borderRadius: '25px',
-                      fontWeight: '600',
-                      border: 'none',
-                      fontSize: '1rem',
-                      boxShadow: '0px 4px 15px rgba(108, 92, 231, 0.3)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0px 6px 20px rgba(108, 92, 231, 0.4)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0px 4px 15px rgba(108, 92, 231, 0.3)';
-                    }}
-                  >
-                    <i className="fas fa-plus me-2"></i>
-                    Sign Your First Waiver
-                  </Link>
-                </div>
-              ) : (
-                <div className="row">
-                  {waivers.map((waiver) => (
-                    <div key={waiver.waiver_id} className="col-12 col-md-6 col-lg-4 mb-4">
-                      <div 
-                        className="waiver-card"
-                        onClick={() => {
-                          dispatch(setWaiverId(waiver.waiver_id));
-                          dispatch(setViewMode(true));
-                          navigate("/confirm-info", { 
-                            state: { 
-                              phone, 
-                              waiverId: waiver.waiver_id,
-                              isReturning: true,
-                              editToCreateNew: true 
-                            } 
-                          });
-                        }}
-                      >
-                        {/* Card Header */}
-                        <div className="waiver-card-header">
-                          <div className="d-flex justify-content-between align-items-center">
-                            <div>
-                              <h5 className="mb-0" style={{ fontWeight: '700', fontSize: '1.1rem' }}>
-                                Waiver #{waiver.waiver_id}
-                              </h5>
-                            </div>
-                            <div>
-                              {waiver.verified_by_staff === 1 ? (
-                                <span className="badge-verified">
-                                  <i className="fas fa-check-circle me-1"></i>
-                                  Verified
-                                </span>
-                              ) : waiver.verified_by_staff === 2 ? (
-                                <span className="badge-inaccurate">
-                                  <i className="fas fa-exclamation-circle me-1"></i>
-                                  Issue
-                                </span>
-                              ) : (
-                                <span className="badge-pending">
-                                  <i className="fas fa-clock me-1"></i>
-                                  Pending
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Card Body */}
-                        <div className="waiver-card-body">
-                          {/* Name */}
-                          <div className="info-row">
-                            <div className="info-icon" style={{ background: 'linear-gradient(135deg, #6C5CE7 0%, #8B7FE8 100%)', color: 'white' }}>
-                              <i className="fas fa-user"></i>
-                            </div>
-                            <div className="flex-grow-1">
-                              <div style={{ fontWeight: '600', fontSize: '1rem', color: '#212529' }}>
-                                {waiver.first_name} {waiver.last_name}
-                              </div>
-                              {waiver.email && (
-                                <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>
-                                  <i className="fas fa-envelope me-1"></i>
-                                  {waiver.email}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Date & Time */}
-                          <div className="info-row">
-                            <div className="info-icon" style={{ background: '#FFD93D', color: '#000' }}>
-                              <i className="fas fa-calendar-alt"></i>
-                            </div>
-                            <div className="flex-grow-1">
-                              <div style={{ fontSize: '0.85rem', color: '#6c757d', fontWeight: '500' }}>Signed On</div>
-                              <div style={{ fontWeight: '600', fontSize: '0.95rem', color: '#212529' }}>
-                                {waiver.signed_at || 'N/A'}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Minors */}
-                          <div className="info-row">
-                            <div className="info-icon" style={{ background: '#DCC07C', color: '#000' }}>
-                              <i className="fas fa-child"></i>
-                            </div>
-                            <div className="flex-grow-1">
-                              <div style={{ fontSize: '0.85rem', color: '#6c757d', fontWeight: '500' }}>Minors Included</div>
-                              <div style={{ fontWeight: '600', fontSize: '0.95rem', color: '#212529' }}>
-                                {waiver.minors && waiver.minors.length > 0 ? (
-                                  <span>{waiver.minors.length} Minor{waiver.minors.length !== 1 ? 's' : ''}</span>
-                                ) : (
-                                  <span style={{ color: '#9ca3af' }}>None</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+          {loading ? (
+            <div className="professional-table-wrapper">
+              <Skeleton height={400} />
             </div>
-          </div>
+          ) : waivers.length === 0 ? (
+            <div className="text-center mt-5 py-5">
+              <div 
+                style={{ 
+                  width: '80px', 
+                  height: '80px', 
+                  margin: '0 auto 20px',
+                  background: '#e9ecef',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="fas fa-file-signature" style={{ fontSize: '40px', color: '#6c757d' }}></i>
+              </div>
+              <h4 className="mb-3" style={{ fontWeight: '600', color: '#495057' }}>No Visits Yet</h4>
+              <p className="text-muted mb-4">
+                Start your skating journey today! Sign your first waiver to get started.
+              </p>
+              <Link 
+                to="/new-customer" 
+                className="btn btn-primary"
+                style={{
+                  padding: '12px 30px',
+                  borderRadius: '8px',
+                  fontWeight: '600'
+                }}
+              >
+                <i className="fas fa-plus me-2"></i>
+                Sign Your First Waiver
+              </Link>
+            </div>
+          ) : (
+            <div className="professional-table-wrapper">
+              <table className="professional-table">
+                <thead>
+                  <tr>
+                    <th>Waiver ID</th>
+                    <th>Name</th>
+                    <th>Signed Date & Time</th>
+                    <th>Minors</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {waivers.map((waiver) => {
+                    const isPending = !waiver.signed_at;
+                    return (
+                    <tr 
+                      key={waiver.waiver_id}
+                      onClick={() => {
+                        dispatch(setWaiverId(waiver.waiver_id));
+                        dispatch(setViewMode(isPending ? false : true));
+                        navigate("/confirm-info", { 
+                          state: { 
+                            phone, 
+                            waiverId: waiver.waiver_id,
+                            isReturning: true,
+                            editToCreateNew: !isPending,
+                            isPending: isPending
+                          } 
+                        });
+                      }}
+                    >
+                      <td className="waiver-id-cell">#{waiver.waiver_id}</td>
+                      <td>
+                        <div className="name-cell">{waiver.first_name} {waiver.last_name}</div>
+                        {waiver.email && (
+                          <div className="email-cell">
+                            <i className="fas fa-envelope me-1"></i>
+                            {waiver.email}
+                          </div>
+                        )}
+                      </td>
+                      <td className="date-cell">
+                        {waiver.signed_at ? (
+                          <>
+                            <i className="far fa-calendar me-1"></i>
+                            {waiver.signed_at}
+                          </>
+                        ) : (
+                          <span style={{color: '#f59e0b', fontWeight: '600'}}>
+                            <i className="far fa-clock me-1"></i>
+                            Draft
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {waiver.minors && waiver.minors.length > 0 ? (
+                          <span className="minors-badge">+{waiver.minors.length}</span>
+                        ) : (
+                          <span style={{ color: '#9ca3af' }}>None</span>
+                        )}
+                      </td>
+                      <td>
+                        {!waiver.signed_at ? (
+                          <span className="badge-pending">Draft</span>
+                        ) : waiver.verified_by_staff === 1 ? (
+                          <span className="badge-verified">Verified</span>
+                        ) : waiver.verified_by_staff === 2 ? (
+                          <span className="badge-inaccurate">Issue</span>
+                        ) : (
+                          <span className="badge-pending">Pending</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </>

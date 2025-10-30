@@ -100,7 +100,7 @@ const verifyOtp = async (otpValue) => {
                   src="/assets/img/image 298.png"
                   alt="back"
                 />
-                Back
+                &nbsp;Back
               </Link>
             </div>
           </div>

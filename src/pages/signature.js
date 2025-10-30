@@ -6,7 +6,7 @@ import axios from "axios";
 import { toast } from 'react-toastify';
 import { BACKEND_URL } from '../config';
 import UserHeader from '../components/UserHeader';
-import { setCurrentStep, setSignatureImage as setSignatureImageRedux } from "../store/slices/waiverSessionSlice";
+import { setCurrentStep, setSignatureImage as setSignatureImageRedux, setViewMode, setWaiverId } from "../store/slices/waiverSessionSlice";
 
 
 
@@ -22,6 +22,8 @@ function Signature() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [minorErrors, setMinorErrors] = useState({});
+  const [showSignatureConfirmDialog, setShowSignatureConfirmDialog] = useState(false);
+  const [originalSignature, setOriginalSignature] = useState(null);
 
   const customerType = useSelector((state) => state.waiverSession.flowType) || "existing";
   const phone = useSelector((state) => state.waiverSession.phone);
@@ -90,6 +92,7 @@ function Signature() {
             if (signatureResponse.data?.signature) {
               const signatureData = signatureResponse.data.signature;
               setSignatureImage(signatureData);
+              setOriginalSignature(signatureData); // Store original for comparison
               
               // Pre-fill the signature pad
               setTimeout(() => {
@@ -182,17 +185,39 @@ function Signature() {
     setSignatureImage(null);
   };
 
-  const handleSubmit = async () => {
-    // If in view mode (viewing existing waiver) AND NOT creating a new waiver, redirect directly to My Waivers
-    if ((viewMode || viewCompleted) && !createNewWaiver) {
-      navigate("/my-waivers", { replace: true });
-      return;
-    }
-
-    // Prevent multiple submissions immediately
+  // Function to proceed with signature submission after confirmation
+  const proceedWithSignature = async () => {
+    setShowSignatureConfirmDialog(false);
+    
+    // User confirmed they want to create a new waiver with the new signature
+    // Set flags to indicate we're creating a new waiver
+    dispatch(setViewMode(false)); // Switch to create mode
+    dispatch(setWaiverId(null)); // Clear waiverId to create new waiver
+    
+    // Prevent multiple submissions
     if (submitting) return;
     setSubmitting(true);
 
+    // Proceed with submission to create new waiver
+    await submitSignature();
+  };
+
+  // Function to cancel signature change and restore original signature
+  const cancelSignatureChange = () => {
+    setShowSignatureConfirmDialog(false);
+    
+    // Restore original signature
+    if (originalSignature && sigPadRef.current) {
+      try {
+        sigPadRef.current.fromDataURL(originalSignature);
+      } catch (error) {
+        console.error("Failed to restore original signature:", error);
+      }
+    }
+  };
+
+  // Extracted submission logic
+  const submitSignature = async () => {
     // Clear previous errors
     setMinorErrors({});
 
@@ -323,6 +348,37 @@ function Signature() {
       }
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    // Get current signature
+    const currentSignature = sigPadRef.current && !sigPadRef.current.isEmpty() 
+      ? sigPadRef.current.toDataURL("image/jpeg", 0.6) 
+      : null;
+    
+    // Check if this is an existing user viewing a completed waiver
+    // A completed waiver has originalSignature (loaded from snapshot)
+    const isViewingCompletedWaiver = originalSignature !== null;
+    const signatureHasChanged = isViewingCompletedWaiver && currentSignature && currentSignature !== originalSignature;
+    
+    // Show confirmation dialog if user is modifying a completed waiver's signature
+    if (isViewingCompletedWaiver && signatureHasChanged && !createNewWaiver) {
+      setShowSignatureConfirmDialog(true);
+      return;
+    }
+
+    // If in view mode without changes (and not creating new waiver), redirect to My Waivers
+    if ((viewMode || viewCompleted) && !createNewWaiver && !signatureHasChanged) {
+      navigate("/my-waivers", { replace: true });
+      return;
+    }
+
+    // Prevent multiple submissions immediately
+    if (submitting) return;
+    setSubmitting(true);
+
+    // Proceed with submission
+    await submitSignature();
   };
 
 function formatPhone(phone = "") {
@@ -685,6 +741,86 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
         </div>
       </div>
     </div>
+
+    {/* Signature Change Confirmation Dialog */}
+    {showSignatureConfirmDialog && (
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}
+        onClick={() => setShowSignatureConfirmDialog(false)}
+      >
+        <div 
+          style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '30px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h4 style={{ 
+            color: '#6C5CE7', 
+            marginBottom: '15px',
+            fontSize: '1.3rem',
+            fontWeight: '600'
+          }}>
+            ⚠️ Signature Change Detected
+          </h4>
+          <p style={{ 
+            color: '#4a5568', 
+            marginBottom: '20px',
+            lineHeight: '1.6'
+          }}>
+            You have changed your signature from your previous waiver. 
+            <strong> By continuing, you will create a new waiver</strong> with this new signature.
+            <br /><br />
+            The original waiver will remain unchanged for record-keeping purposes.
+          </p>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <button
+              onClick={cancelSignatureChange}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                background: 'white',
+                color: '#4a5568',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={proceedWithSignature}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#6C5CE7',
+                color: 'white',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Yes, Create New Waiver
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }

@@ -19,17 +19,19 @@ const StaffList = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [currentUser, setCurrentUser] = useState(null);
-
-  const navigate = useNavigate();
-
-  // Get current user info from localStorage
-  useEffect(() => {
+  const [currentUser] = useState(() => {
     const staffData = localStorage.getItem('staff');
     if (staffData) {
-      setCurrentUser(JSON.parse(staffData));
+      const user = JSON.parse(staffData);
+      console.log('Current user data:', user);
+      console.log('User role:', user.role);
+      console.log('Is superadmin?', user.role === 'superadmin');
+      return user;
     }
-  }, []);
+    return null;
+  });
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);

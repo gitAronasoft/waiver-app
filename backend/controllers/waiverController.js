@@ -383,52 +383,99 @@ const getWaiverSnapshot = async (req, res) => {
     }
 
     const waiver = waivers[0];
+    
+    // Check if this is a pending waiver (no signature/snapshot yet)
+    const isPending = !waiver.signed_at;
 
     // Get current user data for phone and other fields not in snapshot
     const [users] = await db.query(
-      "SELECT cell_phone, country_code, home_phone, work_phone FROM users WHERE id = ?",
+      "SELECT * FROM users WHERE id = ?",
       [waiver.user_id]
     );
 
-    // Parse signer_name into first_name and last_name
-    const nameParts = waiver.signer_name ? waiver.signer_name.split(' ') : ['', ''];
-    const first_name = nameParts[0] || '';
-    const last_name = nameParts.slice(1).join(' ') || '';
+    if (users.length === 0) {
+      return res.status(404).json({
+        error: "User not found for this waiver",
+      });
+    }
 
-    // Build customer object from snapshot data
-    const customer = {
-      id: waiver.user_id,
-      first_name,
-      last_name,
-      email: waiver.signer_email,
-      dob: waiver.signer_dob,
-      address: waiver.signer_address,
-      city: waiver.signer_city,
-      province: waiver.signer_province,
-      postal_code: waiver.signer_postal,
-      cell_phone: users.length > 0 ? users[0].cell_phone : null,
-      country_code: users.length > 0 ? users[0].country_code : null,
-      home_phone: users.length > 0 ? users[0].home_phone : null,
-      work_phone: users.length > 0 ? users[0].work_phone : null,
-      can_email: null,
-    };
+    const user = users[0];
 
-    // Parse minors from snapshot JSON
-    let minors = [];
-    if (waiver.minors_snapshot) {
-      try {
-        const parsedMinors = JSON.parse(waiver.minors_snapshot);
-        minors = parsedMinors.map((m, index) => ({
-          id: `snapshot_${index}`, // Temporary ID for display purposes
-          first_name: m.first_name,
-          last_name: m.last_name,
-          dob: m.dob,
-          status: 1,
-          checked: true,
-          isSnapshot: true, // Flag to indicate this is historical data
-        }));
-      } catch (parseError) {
-        console.error(`Error parsing minors_snapshot for waiver ${waiverId}:`, parseError);
+    // For pending waivers, use data from users table instead of snapshot
+    let first_name, last_name, customer, minors;
+    
+    if (isPending) {
+      // Pending waiver - use current user data
+      first_name = user.first_name;
+      last_name = user.last_name;
+      
+      customer = {
+        id: user.id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        dob: user.dob,
+        address: user.address,
+        city: user.city,
+        province: user.province,
+        postal_code: user.postal_code,
+        country_code: user.country_code,
+        cell_phone: user.cell_phone,
+        home_phone: user.home_phone,
+        work_phone: user.work_phone,
+        can_email: user.can_email
+      };
+      
+      // Get active minors from minors table
+      const [minorsData] = await db.query(
+        "SELECT * FROM minors WHERE user_id = ? AND status = 1",
+        [user.id]
+      );
+      minors = minorsData;
+      
+    } else {
+      // Completed waiver - use snapshot data
+      const nameParts = waiver.signer_name ? waiver.signer_name.split(' ') : ['', ''];
+      first_name = nameParts[0] || '';
+      last_name = nameParts.slice(1).join(' ') || '';
+
+      // Build customer object from snapshot data
+      customer = {
+        id: waiver.user_id,
+        first_name,
+        last_name,
+        email: waiver.signer_email,
+        dob: waiver.signer_dob,
+        address: waiver.signer_address,
+        city: waiver.signer_city,
+        province: waiver.signer_province,
+        postal_code: waiver.signer_postal,
+        cell_phone: user.cell_phone,
+        country_code: user.country_code,
+        home_phone: user.home_phone,
+        work_phone: user.work_phone,
+        can_email: null,
+      };
+
+      // Parse minors from snapshot JSON
+      if (waiver.minors_snapshot) {
+        try {
+          const parsedMinors = JSON.parse(waiver.minors_snapshot);
+          minors = parsedMinors.map((m, index) => ({
+            id: `snapshot_${index}`, // Temporary ID for display purposes
+            first_name: m.first_name,
+            last_name: m.last_name,
+            dob: m.dob,
+            status: 1,
+            checked: true,
+            isSnapshot: true, // Flag to indicate this is historical data
+          }));
+        } catch (parseError) {
+          console.error(`Error parsing minors_snapshot for waiver ${waiverId}:`, parseError);
+          minors = [];
+        }
+      } else {
+        minors = [];
       }
     }
 

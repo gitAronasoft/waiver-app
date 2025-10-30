@@ -3,6 +3,104 @@
 [x] 3. Verify the project is working using the feedback tool
 [x] 4. Inform user the import is completed and they can start building, mark the import as completed using the complete_project_import tool
 
+## Session 39 (October 30, 2025) - Fixed Pending Waiver Completion Flow:
+
+[x] 363. Analyzed user-reported issue: OTP expiration creates pending waivers with empty pages
+[x] 364. Updated UserDashboard.js to detect pending waivers (!signed_at) and show "Draft" badge
+[x] 365. Modified UserDashboard to set viewMode=false for pending waivers (complete vs view)
+[x] 366. Enhanced backend getWaiverSnapshot to bifurcate pending vs completed waivers
+[x] 367. Added logic to load current user/minor data for pending waivers from users table
+[x] 368. Preserved existing snapshot logic for completed waivers (historical data)
+[x] 369. Restarted both workflows and verified compilation success
+[x] 370. Called architect for comprehensive review - confirmed data integrity and flow correctness
+[x] 371. Updated progress tracker with Session 39 information
+
+### Session 39 Bug Fixed:
+
+**Bug: Pending Waivers Show Empty Pages After OTP Expiration** ✅
+
+**User Scenario:**
+1. New customer fills form and creates waiver record
+2. OTP is sent but expires before verification (5-minute timeout)
+3. User record is created in database, but waiver remains incomplete (signed_at IS NULL)
+4. User logs in as existing customer and sees "Pending" waiver
+5. Clicking the waiver shows empty confirm-info and signature pages
+
+**Root Cause:**
+- When waiver is created, snapshot columns (signer_name, signer_email, etc.) are NULL until signature is saved
+- Existing customer flow tried to load waiver snapshot data for ALL waivers (including pending ones)
+- Snapshot data doesn't exist for pending waivers, resulting in empty forms
+- System didn't distinguish between pending (need to complete) vs completed (can view) waivers
+
+**Solution Implemented:**
+
+**1. Frontend - UserDashboard.js (Lines 286-347):**
+- Added `isPending` detection: `const isPending = !waiver.signed_at`
+- Shows "Draft" label with clock icon instead of date for unsigned waivers
+- Sets `viewMode=false` for pending waivers (edit mode, not view mode)
+- Sets `viewMode=true` for completed waivers (view mode, can edit to create new)
+- Passes `isPending` flag in navigation state for downstream components
+- Status badge shows "Draft" for unsigned waivers instead of "Pending"
+
+**2. Backend - waiverController.js getWaiverSnapshot (Lines 390-483):**
+- Added check: `const isPending = !waiver.signed_at`
+- **For Pending Waivers (isPending = true):**
+  - Loads current user data from `users` table (all fields)
+  - Loads active minors from `minors` table with `status = 1`
+  - Returns live, editable data so customer can complete the waiver
+- **For Completed Waivers (isPending = false):**
+  - Loads historical snapshot data from waiver columns (signer_name, signer_email, etc.)
+  - Parses minors from `minors_snapshot` JSON field
+  - Returns frozen historical data as it was when waiver was signed
+- Added user existence validation to prevent errors
+
+**Data Flow After Fix:**
+
+**Scenario 1: OTP Expires - Pending Waiver Completion**
+1. New customer creates waiver → User record + Waiver record created (signed_at = NULL)
+2. OTP sent but expires before verification
+3. Customer logs in as existing customer → Sees waiver with "Draft" badge
+4. Clicks draft waiver → UserDashboard sets (waiverId, viewMode=false, isPending=true)
+5. Navigate to /confirm-info
+6. ConfirmCustomerInfo calls getWaiverSnapshot endpoint
+7. Backend detects pending waiver → Returns current user data + active minors ✅
+8. Form displays with user's current information (editable)
+9. User can review, add/remove minors, update info
+10. Continue to signature page → Sign waiver → Snapshot created ✅
+11. Accept rules → Waiver completed ✅
+12. Redirect to My Waivers → Draft becomes "Pending" (awaiting staff verification)
+
+**Scenario 2: Viewing Completed Waiver (Historical)**
+1. User clicks completed waiver from dashboard
+2. UserDashboard sets (waiverId, viewMode=true, isPending=false)
+3. Backend detects completed waiver → Returns snapshot data ✅
+4. Shows historical data exactly as it was when signed ✅
+5. If user makes changes → Creates NEW waiver (preserves original)
+
+**Benefits:**
+- Pending waivers can now be completed without data loss
+- Clear visual distinction between drafts and completed waivers
+- No breaking changes to existing completed waiver viewing flow
+- Data integrity maintained: pending uses current data, completed uses snapshot
+- Prevents user frustration from empty pages after OTP expiration
+
+**Architect Review Feedback:**
+- ✅ Logic for detecting pending waivers is correct and robust
+- ✅ Backend cleanly bifurcates pending vs completed waiver data retrieval
+- ✅ Front-end correctly toggles view/edit mode based on pending status
+- ✅ No security issues observed
+- ✅ Data integrity maintained for both pending and completed flows
+- 📌 Recommendation: Add regression testing for pending waiver completion
+- 📌 Recommendation: Consider auto-cleanup of very old drafts (24h+ old)
+
+**Files Modified:**
+1. `src/pages/UserDashboard.js` - Added isPending detection and draft badge (lines 286-347)
+2. `backend/controllers/waiverController.js` - Enhanced getWaiverSnapshot for pending waivers (lines 390-483)
+
+**All 371 tasks marked as complete [x]**
+
+---
+
 ## Session 38 (October 30, 2025) - Comprehensive Application Documentation:
 
 [x] 352. Analyzed complete database schema from migration files

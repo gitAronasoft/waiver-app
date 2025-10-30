@@ -30,13 +30,13 @@ function UserHeader({
   return (
     <div className="container-fluid" style={{ backgroundColor: '#fff', paddingBottom: '15px' }}>
       <div className="container">
-        <div className="row align-items-center" style={{ marginTop: '10px' }}>
+        <div className="row align-items-center">
           {/* Left side - Back Button */}
           <div className="col-6 col-md-2">
             {showBack && (
-              <div className="back-btn">
+              <div className="back-btn" style={{ marginTop: "0px"}}>
                 <div
-                  style={{ cursor: "pointer", display: 'flex', alignItems: 'center', gap: '6px', fontSize: '18px'}}
+                  style={{ cursor: "pointer", display: 'flex', alignItems: 'center', gap: '6px', fontSize: '20px'}}
                   onClick={handleBack}
                 >
                   <img
@@ -45,7 +45,7 @@ function UserHeader({
                     className="img-fluid"
                     style={{ maxWidth: '20px' }}
                   />
-                  <span className="d-none d-md-inline">BACK</span>
+                  <span className="d-none d-md-inline">Back</span>
                 </div>
               </div>
             )}
