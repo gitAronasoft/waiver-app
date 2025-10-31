@@ -187,11 +187,33 @@ const createWaiver = async (req, res) => {
             `✅ OTP SMS sent to user ${formattedPhone}: ${otp}`,
           );
         } catch (twilioError) {
+          const errorId = `ERR_${Date.now()}`;
           console.error(
-            `⚠️ Twilio SMS failed for user:`,
+            `[${errorId}] Twilio SMS failed for user:`,
             twilioError.message,
           );
-          // Don't fail the request if SMS fails
+          
+          // Check if error is due to invalid phone number
+          const isInvalidPhone = twilioError.message && (
+            twilioError.message.includes('not a valid phone number') ||
+            twilioError.message.includes('is not a mobile number') ||
+            twilioError.message.includes('invalid phone number') ||
+            twilioError.code === 21211 || // Invalid 'To' Phone Number
+            twilioError.code === 21614    // 'To' number is not a valid mobile number
+          );
+          
+          if (isInvalidPhone) {
+            // Rollback transaction - delete user and waiver we just created
+            await connection.rollback();
+            return res.status(400).json({
+              error: 'Invalid phone number',
+              message: 'The phone number you entered doesn\'t appear to be valid. Please double-check your phone number (including area code) and try again. If you continue to experience issues, please visit our front desk or contact us at info@skate-play.com for assistance.',
+              errorId
+            });
+          }
+          
+          // For other Twilio errors, allow manual verification
+          console.warn(`⚠️ OTP generated but SMS failed. User can still verify manually.`);
         }
 
         // Log OTP in development
