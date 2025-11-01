@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import axios from "axios";
 import { toast } from "react-toastify";
-import { BACKEND_URL } from "../config";
 import UserHeader from "../components/UserHeader";
-import { setCurrentStep, setCustomerData, setMinors, setWaiverId, setViewMode } from "../store/slices/waiverSessionSlice";
+import { setCurrentStep, setCustomerData, setMinors, setProgress } from "../store/slices/waiverSessionSlice";
 
 function ConfirmCustomerInfo() {
   const navigate = useNavigate();
@@ -13,12 +11,10 @@ function ConfirmCustomerInfo() {
   const phone = useSelector((state) => state.waiverSession.phone);
   const customerId = useSelector((state) => state.waiverSession.customerId);
   const waiverId = useSelector((state) => state.waiverSession.waiverId);
-  const viewMode = useSelector((state) => state.waiverSession.progress.viewMode);
 
   const [formData, setFormData] = useState(null);
   const [originalData, setOriginalData] = useState(null);
   const [originalMinors, setOriginalMinors] = useState([]);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Route protection: Redirect if accessed directly without valid state
   useEffect(() => {
@@ -29,85 +25,65 @@ function ConfirmCustomerInfo() {
   }, [phone, customerId, waiverId, navigate]);
   const [minorList, setMinorList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
   const [minorErrors, setMinorErrors] = useState({});
 
+  // Get Redux data at component top level
+  const reduxCustomerData = useSelector((state) => state.waiverSession.customerData);
+  const reduxMinors = useSelector((state) => state.waiverSession.minors);
+
   useEffect(() => {
-    if (phone || waiverId || customerId) {
-      setLoading(true);
+    // Use data from Redux that was already fetched after login
+    if (reduxCustomerData && reduxCustomerData.id) {
+      console.log('📊 Using cached data from Redux');
+      
+      // Format phone numbers for display
+      const formatPhone = (num) => {
+        if (!num) return "";
+        const digits = num.replace(/\D/g, "").slice(0, 10);
+        if (digits.length === 10) {
+          return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+        }
+        return digits;
+      };
 
-      // Determine which endpoint to use:
-      // - If waiverId exists: use snapshot (could be viewing OR using as template for new waiver)
-      // - If customerId exists: use customer-info-by-id (creating new waiver for returning customer)
-      // - Otherwise: use phone-based lookup
-      const endpoint = waiverId
-        ? `${BACKEND_URL}/api/waivers/waiver-snapshot?waiverId=${waiverId}`
-        : customerId
-        ? `${BACKEND_URL}/api/waivers/customer-info-by-id?customerId=${customerId}`
-        : `${BACKEND_URL}/api/waivers/customer-info?phone=${phone}`;
+      const formattedData = {
+        ...reduxCustomerData,
+        home_phone: formatPhone(reduxCustomerData.home_phone),
+        cell_phone: formatPhone(reduxCustomerData.cell_phone),
+        work_phone: formatPhone(reduxCustomerData.work_phone),
+        dob: reduxCustomerData.dob ? new Date(reduxCustomerData.dob).toISOString().split("T")[0] : "",
+        can_email: reduxCustomerData.can_email === 1 || reduxCustomerData.can_email === "1",
+      };
 
-      console.log(`📊 Fetching data from: ${endpoint}`, { waiverId, viewMode, customerId, phone });
+      setFormData(formattedData);
+      
+      if (waiverId) {
+        setOriginalData(JSON.parse(JSON.stringify(formattedData)));
+      }
 
-      axios
-        .get(endpoint)
-        .then((res) => {
-          const data = res.data.customer;
-
-          // ✅ Convert numbers into masked format if exists
-          const formatPhone = (num) => {
-            if (!num) return "";
-            const digits = num.replace(/\D/g, "").slice(0, 10);
-            if (digits.length === 10) {
-              return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-            }
-            return digits;
-          };
-
-          data.home_phone = formatPhone(data.home_phone);
-          data.cell_phone = formatPhone(data.cell_phone);
-          data.work_phone = formatPhone(data.work_phone);
-
-          // ✅ Format DOB for date input (YYYY-MM-DD)
-          if (data.dob) {
-            data.dob = new Date(data.dob).toISOString().split("T")[0];
-          }
-
-          data.can_email = data.can_email === 1 || data.can_email === "1";
-          setFormData(data);
-          
-          // Store original data for comparison when loading a waiver (for "edit to create new" flow)
-          if (waiverId) {
-            setOriginalData(JSON.parse(JSON.stringify(data)));
-          }
-
-          if (res.data.minors) {
-            const minorsWithFlags = res.data.minors.map((minor) => ({
-              ...minor,
-              dob: minor.dob
-                ? new Date(minor.dob).toISOString().split("T")[0]
-                : "",
-              checked: waiverId ? true : (minor.status === 1), // Check all minors when loading from waiver
-              isNew: false,
-            }));
-            setMinorList(minorsWithFlags);
-            
-            // Store original minors for comparison when loading a waiver
-            if (waiverId) {
-              setOriginalMinors(JSON.parse(JSON.stringify(minorsWithFlags)));
-            }
-          }
-        })
-        .catch((err) => {
-          console.error(err);
-          toast.error(
-            err?.response?.data?.message || "We couldn't load your information. Please try again.",
-          );
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+      // Set minors from Redux
+      if (reduxMinors && reduxMinors.length > 0) {
+        const minorsWithFlags = reduxMinors.map((minor) => ({
+          ...minor,
+          dob: minor.dob ? new Date(minor.dob).toISOString().split("T")[0] : "",
+          checked: minor.checked !== undefined ? minor.checked : true,
+          isNew: minor.isNew || false,
+        }));
+        setMinorList(minorsWithFlags);
+        
+        if (waiverId) {
+          setOriginalMinors(JSON.parse(JSON.stringify(minorsWithFlags)));
+        }
+      }
+      
+      setLoading(false);
+    } else {
+      // If Redux data is missing, redirect to login to fetch it again
+      console.warn("No customer data in Redux, redirecting to login");
+      toast.error("Session expired. Please log in again.");
+      navigate("/login", { replace: true });
     }
-  }, [phone, customerId, waiverId, viewMode]);
+  }, [reduxCustomerData, reduxMinors, waiverId, navigate, dispatch]);
 
   // const handleChange = (e) => {
   //   const { name, value, type } = e.target;
@@ -233,8 +209,10 @@ function ConfirmCustomerInfo() {
       
       if (!original) return true; // Minor was removed or added
       
-      // Check if checked status changed
-      if (current.checked !== original.checked) return true;
+      // Check if checked status changed (convert to boolean for comparison)
+      const currentChecked = Boolean(current.checked);
+      const originalChecked = Boolean(original.checked);
+      if (currentChecked !== originalChecked) return true;
       
       // Check if minor data changed (shouldn't happen as fields are readonly, but checking anyway)
       if (current.first_name !== original.first_name ||
@@ -281,25 +259,12 @@ function ConfirmCustomerInfo() {
       return;
     }
 
-    // Check if loading from a waiver (to create new) and modifications were made
-    if (waiverId && hasModifications()) {
-      // Show confirmation dialog
-      setShowConfirmDialog(true);
-      return;
-    }
-
-    // If no modifications or not loading from waiver, proceed normally
-    proceedToSignature();
-  };
-
-  const proceedToSignature = async () => {
-    setShowConfirmDialog(false);
-    
+    // Directly proceed to signature page without confirmation
     const isModified = hasModifications();
     const stripMask = (val) => (val ? val.replace(/\D/g, "") : "");
     const updatedData = {
       ...formData,
-      id: formData.id || customerId, // Ensure customer ID is always included
+      id: formData.id || customerId,
       cell_phone: stripMask(formData.cell_phone),
       minors: minorList.map((minor) => ({
         id: minor.id,
@@ -311,84 +276,39 @@ function ConfirmCustomerInfo() {
       })),
     };
 
-    // If modifications were made and we're editing from a waiver, create a NEW waiver
-    if (isModified && waiverId) {
-      setUpdating(true);
-      try {
-        // Update customer data first
-        await axios.post(
-          `${BACKEND_URL}/api/waivers/update-customer`,
-          updatedData,
-        );
-        
-        // Create a new unsigned waiver by calling createWaiver
-        const createWaiverPayload = {
-          ...formData,
-          cell_phone: stripMask(formData.cell_phone),
-          home_phone: stripMask(formData.home_phone),
-          work_phone: stripMask(formData.work_phone),
-          minors: minorList
-            .filter(m => m.checked) // Only include checked minors
-            .map(m => ({
-              first_name: m.first_name,
-              last_name: m.last_name,
-              dob: m.dob,
-            })),
-          send_otp: false, // Don't send OTP for returning users
-        };
-        
-        await axios.post(
-          `${BACKEND_URL}/api/waivers`,
-          createWaiverPayload,
-        );
-        
-        // Clear the old waiverId since we're creating a new one
-        // The backend will create a new unsigned waiver for this user
-        dispatch(setWaiverId(null));
-        
-        // Set viewMode to false since we're creating a new waiver that needs to be signed
-        dispatch(setViewMode(false));
-        
-        console.log("✅ Created new unsigned waiver for modified data");
-      } catch (err) {
-        console.error("Error creating new waiver:", err);
-        toast.error("We couldn't create your new waiver. Please try again.");
-        setUpdating(false);
-        return;
-      } finally {
-        setUpdating(false);
-      }
-    } else if (isModified && !waiverId) {
-      // Just updating existing customer without creating new waiver
-      setUpdating(true);
-      try {
-        await axios.post(
-          `${BACKEND_URL}/api/waivers/update-customer`,
-          updatedData,
-        );
-      } catch (err) {
-        console.error("Error updating customer:", err);
-        toast.error("We couldn't update your information. Please try again.");
-        setUpdating(false);
-        return;
-      } finally {
-        setUpdating(false);
-      }
+    // Store flag in Redux so SignaturePage can check it (no database update here)
+    if (isModified) {
+      dispatch(setProgress({ hasDataModifications: true }));
+      console.log("✅ Modifications detected, flagged for signature page to update database");
+    } else {
+      dispatch(setProgress({ hasDataModifications: false }));
     }
 
     // Save customer data and minors to Redux so signature page can use them
     dispatch(setCustomerData(updatedData));
     dispatch(setMinors(updatedData.minors));
     dispatch(setCurrentStep('SIGNATURE'));
-    navigate("/signature", { replace: true });
+    navigate("/sign-waiver", { replace: true });
   };
+
+  const handleMinorCheckChange = (index, checked) => {
+    const updated = [...minorList];
+    updated[index] = {
+      ...updated[index],
+      checked: checked
+    };
+    setMinorList(updated);
+    // Update Redux immediately so signature page reflects changes
+    dispatch(setMinors(updated));
+  };
+
   if (loading || !formData) {
     return <div className="text-center mt-5">Loading customer info...</div>;
   }
 
   return (
     <>
-      <UserHeader showBack={true} backTo="/my-waivers" backState={{ phone }} />
+      <UserHeader />
       <div className="container-fluid">
         <div className="container text-center">
         <div className="row">
@@ -592,13 +512,10 @@ function ConfirmCustomerInfo() {
                     <div style={{ paddingTop: "8px" }}>
                       <input
                         type="checkbox"
-                        checked={minor.checked}
-                        onChange={(e) => {
-                          const updated = [...minorList];
-                          updated[index].checked = e.target.checked;
-                          setMinorList(updated);
-                        }}
-                        class="custom-checkbox"
+                        checked={!!minor.checked}
+                        onChange={(e) => handleMinorCheckChange(index, e.target.checked)}
+                        className="custom-checkbox"
+                        style={{ cursor: 'pointer' }}
                       />
                     </div>
 
@@ -752,7 +669,6 @@ function ConfirmCustomerInfo() {
                     type="button"
                     className="btn btn-primary"
                     onClick={goToSignature}
-                    disabled={updating}
                     style={{
                       backgroundColor: "#007bff",
                       border: "none",
@@ -763,7 +679,7 @@ function ConfirmCustomerInfo() {
                       minWidth: "200px",
                     }}
                   >
-                    {updating ? "Processing..." : hasModifications() ? "Confirm" : "Continue"}
+                    Confirm
                   </button>
                 </div>
               </div>           
@@ -771,81 +687,6 @@ function ConfirmCustomerInfo() {
           </div>
         </div>
       </div>
-
-      {/* Confirmation Dialog for Modified Waiver */}
-      {showConfirmDialog && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-          }}
-          onClick={() => setShowConfirmDialog(false)}
-        >
-          <div
-            style={{
-              backgroundColor: "white",
-              padding: "30px",
-              borderRadius: "12px",
-              maxWidth: "500px",
-              width: "90%",
-              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h4 style={{ marginBottom: "20px", color: "#333", fontWeight: "600" }}>
-              Confirm Changes
-            </h4>
-            <p style={{ marginBottom: "25px", color: "#666", lineHeight: "1.6" }}>
-              You have made changes to the waiver information. Proceeding will create a new waiver that requires your signature.
-              Do you want to continue with these changes?
-            </p>
-            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                onClick={() => setShowConfirmDialog(false)}
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: "8px",
-                  border: "1px solid #ddd",
-                  backgroundColor: "white",
-                  color: "#666",
-                  fontSize: "15px",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={proceedToSignature}
-                disabled={updating}
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: "8px",
-                  border: "none",
-                  backgroundColor: "#007bff",
-                  color: "white",
-                  fontSize: "15px",
-                  fontWeight: "500",
-                  cursor: updating ? "not-allowed" : "pointer",
-                  opacity: updating ? 0.7 : 1,
-                }}
-              >
-                {updating ? "Processing..." : "Yes, Continue"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
     </>
   );

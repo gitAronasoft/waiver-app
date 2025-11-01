@@ -1,50 +1,49 @@
-import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
-
-import Index from "./pages/firstsetp";
-import NewCustomerForm from "./pages/NewCustomerForm";
-import ExistingCustomerLogin from "./pages/ExistingCustomerLogin";
-import OtpVerified from "./pages/otpverified";
-import ConfirmCustomerInfo from "./pages/ConfirmCustomerInfo";
-import RuleReminder from "./pages/RuleReminder";
-import Signature from "./pages/signature";
-import AllDone from "./pages/AllDone";
-import StarRating from "./pages/StarRatingPage";
-import Feedback from "./pages/FeedbackPage";
-import UserDashboard from "./pages/UserDashboard";
-import LoginAdmin from "./pages/admin/login";
-import Home from "./pages/admin/home";
-import History from "./pages/admin/History";
-import ClientProfilePage from "./pages/admin/ClientProfilePage";
-import ForgotPasswordForm from "./pages/admin/forgetPassword";
-import ResetPasswordForm from "./pages/admin/ResetPassword";
-import ChangePassword from "./pages/admin/ChangePassword";
-import StaffList from "./pages/admin/StaffList";
-import AddStaff from "./pages/admin/AddStaff";
-import UpdateStaff from "./pages/admin/UpdateStaff";
-import AdminProfile from "./pages/admin/AdminProfile";
-import AdminFeedbackPage from "./pages/admin/AdminFeedbackPage";
+import React, { useState, useEffect, lazy, Suspense } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import AdminPrivateRoute from "./pages/components/AdminPrivateRoute";
 import LoadingOverlay from "./components/LoadingOverlay";
 
+const WelcomePage = lazy(() => import("./pages/WelcomePage"));
+const NewCustomerForm = lazy(() => import("./pages/NewCustomerForm"));
+const ExistingCustomerLogin = lazy(() => import("./pages/ExistingCustomerLogin"));
+const VerifyOtpPage = lazy(() => import("./pages/VerifyOtpPage"));
+const ConfirmCustomerInfo = lazy(() => import("./pages/ConfirmCustomerInfo"));
+const RuleReminder = lazy(() => import("./pages/RuleReminder"));
+const SignaturePage = lazy(() => import("./pages/SignaturePage"));
+const AllDone = lazy(() => import("./pages/AllDone"));
+const StarRating = lazy(() => import("./pages/StarRatingPage"));
+const Feedback = lazy(() => import("./pages/FeedbackPage"));
+const LoginAdmin = lazy(() => import("./pages/admin/login"));
+const Home = lazy(() => import("./pages/admin/home"));
+const History = lazy(() => import("./pages/admin/History"));
+const ClientProfilePage = lazy(() => import("./pages/admin/ClientProfilePage"));
+const ForgotPasswordForm = lazy(() => import("./pages/admin/forgetPassword"));
+const ResetPasswordForm = lazy(() => import("./pages/admin/ResetPassword"));
+const ChangePassword = lazy(() => import("./pages/admin/ChangePassword"));
+const StaffList = lazy(() => import("./pages/admin/StaffList"));
+const AddStaff = lazy(() => import("./pages/admin/AddStaff"));
+const UpdateStaff = lazy(() => import("./pages/admin/UpdateStaff"));
+const AdminProfile = lazy(() => import("./pages/admin/AdminProfile"));
+const AdminFeedbackPage = lazy(() => import("./pages/admin/AdminFeedbackPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
 function AppContent() {
-  const location = useLocation();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoading(true);
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [location.pathname]);
+  }, []);
 
   return (
     <>
       <LoadingOverlay isVisible={isLoading} />
-      <Routes>
+      <Suspense fallback={<LoadingOverlay isVisible={true} />}>
+        <Routes>
         {/* Admin Public Route */}
         <Route path="/admin/login" element={<LoginAdmin />} />
 
@@ -134,21 +133,23 @@ function AppContent() {
 
 
         {/* Public User Routes */}
-        <Route path="/" element={<Index />} />
-        <Route path="/new-customer" element={<NewCustomerForm />} />
-        <Route path="/existing-customer" element={<ExistingCustomerLogin />} />
-        <Route path="/otp-verified" element={<OtpVerified />} />
-        <Route path="/confirm-info" element={<ConfirmCustomerInfo />} />
-        <Route path="/signature" element={<Signature />} />
+        <Route path="/" element={<WelcomePage />} />
+        <Route path="/register" element={<NewCustomerForm />} />
+        <Route path="/login" element={<ExistingCustomerLogin />} />
+        <Route path="/verify-phone" element={<VerifyOtpPage />} />
+        <Route path="/review-information" element={<ConfirmCustomerInfo />} />
+        <Route path="/sign-waiver" element={<SignaturePage />} />
         <Route path="/rules" element={<RuleReminder />} />
-
-        <Route path="/all-done" element={<AllDone />} />
+        <Route path="/complete" element={<AllDone />} />
         <Route path="/rate/:id" element={<StarRating />} />
         {/* <Route path="/feedback/:id" element={<Feedback />} /> */}
         <Route path="/feedback" element={<Feedback />} />
-        <Route path="/my-waivers" element={<UserDashboard />} />
+        
+        {/* Catch-all route for 404 - must be last */}
+        <Route path="*" element={<NotFound />} />
 
       </Routes>
+      </Suspense>
     </>
   );
 }

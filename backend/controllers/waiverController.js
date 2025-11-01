@@ -13,7 +13,6 @@ const client = twilio(
  *
  * Index suggestions:
  * - CREATE INDEX idx_users_cell_phone ON users(cell_phone)
- * - CREATE INDEX idx_minors_user_id ON minors(user_id)
  */
 const createWaiver = async (req, res) => {
   const connection = await db.getConnection();
@@ -111,43 +110,35 @@ const createWaiver = async (req, res) => {
       console.log(`✅ Created new user (ID: ${userId}) - Phone: ${cell_phone}`);
     }
     
-    // Handle minors for this user
-    if (existingUsers.length > 0) {
-      // For EXISTING users: deactivate old minors before inserting new ones
-      // This prevents duplicate/obsolete minors from accumulating
-      await connection.query(
-        "UPDATE minors SET status = 0 WHERE user_id = ?",
-        [userId]
-      );
-      console.log(`✅ Deactivated old minors for existing user ${userId}`);
-    }
+    // Prepare minors snapshot (store minors in JSON format in waiver record)
+    const minorsSnapshot = minors && minors.length > 0 ? JSON.stringify(minors) : null;
     
-    // Insert new minors for this user (both new and existing users)
     if (minors && minors.length > 0) {
-      const minorValues = minors.map((minor) => [
-        userId,
-        minor.first_name,
-        minor.last_name,
-        minor.dob,
-        1, // status = 1 (active)
-      ]);
-
-      await connection.query(
-        "INSERT INTO minors (user_id, first_name, last_name, dob, status) VALUES ?",
-        [minorValues],
-      );
-      
-      console.log(`✅ Added ${minors.length} minor(s) for user ${userId}`);
+      console.log(`✅ Prepared ${minors.length} minor(s) for waiver snapshot`);
     }
 
-    // Create waiver entry
+    // Prepare signer snapshot data from user data
+    const signerName = `${first_name} ${last_name}`;
+    const signerEmail = email;
+    const signerAddress = address;
+    const signerCity = city;
+    const signerProvince = province;
+    const signerPostal = postal_code;
+    const signerDob = dob;
+
+    // Create waiver entry with signer snapshot and minors snapshot
     const [waiverResult] = await connection.query(
-      "INSERT INTO waivers (user_id, signed_at, completed, verified_by_staff, staff_id) VALUES (?, NULL, 0, 0, 0)",
-      [userId],
+      `INSERT INTO waivers 
+       (user_id, signer_name, signer_email, signer_address, signer_city, 
+        signer_province, signer_postal, signer_dob, minors_snapshot, 
+        signed_at, completed, verified_by_staff, staff_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, 0)`,
+      [userId, signerName, signerEmail, signerAddress, signerCity, 
+       signerProvince, signerPostal, signerDob, minorsSnapshot],
     );
 
     const waiverId = waiverResult.insertId;
-    console.log(`✅ Created waiver (ID: ${waiverId}) for user ${userId}`)
+    console.log(`✅ Created waiver (ID: ${waiverId}) with signer snapshot for user ${userId}`)
 
     // SEND OTP via SMS for all new customer signups
     if (send_otp) {
@@ -252,13 +243,15 @@ const createWaiver = async (req, res) => {
 
     await connection.commit();
 
+    console.log(`✅ Waiver creation successful - userId: ${userId}, waiverId: ${waiverId}`);
+
     res.status(201).json({
       success: true,
       message: send_otp
         ? "Waiver created and OTP sent successfully"
         : "Waiver created successfully",
-      userId,
-      waiverId,
+      userId: userId,
+      waiverId: waiverId,
     });
   } catch (error) {
     await connection.rollback();
@@ -282,270 +275,7 @@ const createWaiver = async (req, res) => {
 };
 
 /**
- * Gets customer information by phone number
- * Includes associated minors
- */
-const getCustomerInfo = async (req, res) => {
-  try {
-    const { phone } = req.query;
-
-    // Validate phone parameter
-    if (!phone) {
-      return res.status(400).json({
-        error: "Phone number is required",
-      });
-    }
-
-    // Order by created_at DESC to get the most recent customer record
-    // This ensures that when the same phone number is used for multiple signups,
-    // we return the newest customer data instead of the oldest
-    const [customers] = await db.query(
-      "SELECT * FROM users WHERE cell_phone = ? ORDER BY created_at DESC LIMIT 1",
-      [phone],
-    );
-
-    if (customers.length === 0) {
-      return res.status(404).json({
-        error: "Customer not found",
-      });
-    }
-
-    const customer = customers[0];
-
-    const [minors] = await db.query(
-      "SELECT * FROM minors WHERE user_id = ? AND status = 1",
-      [customer.id],
-    );
-
-    res.json({ customer, minors });
-  } catch (error) {
-    const errorId = `ERR_${Date.now()}`;
-    console.error(`[${errorId}] Error fetching customer info:`, {
-      message: error.message,
-      phone: req.query.phone,
-    });
-
-    res.status(500).json({
-      error: "Failed to fetch customer information",
-      errorId,
-    });
-  }
-};
-
-/**
- * Gets customer information by customer ID
- * Includes associated minors
- */
-const getCustomerInfoById = async (req, res) => {
-  try {
-    const { customerId } = req.query;
-
-    // Validate customerId parameter
-    if (!customerId) {
-      return res.status(400).json({
-        error: "Customer ID is required",
-      });
-    }
-
-    const [customers] = await db.query(
-      "SELECT * FROM users WHERE id = ? LIMIT 1",
-      [customerId],
-    );
-
-    if (customers.length === 0) {
-      return res.status(404).json({
-        error: "Customer not found",
-      });
-    }
-
-    const customer = customers[0];
-
-    // Get only ACTIVE minors for this customer (status = 1)
-    // This ensures we show current waiver minors, not historical ones
-    const [minors] = await db.query(
-      "SELECT * FROM minors WHERE user_id = ? AND status = 1",
-      [customer.id],
-    );
-
-    res.json({ customer, minors });
-  } catch (error) {
-    const errorId = `ERR_${Date.now()}`;
-    console.error(`[${errorId}] Error fetching customer info by ID:`, {
-      message: error.message,
-      customerId: req.query.customerId,
-    });
-
-    res.status(500).json({
-      error: "Failed to fetch customer information",
-      errorId,
-    });
-  }
-};
-
-/**
- * Gets waiver snapshot data by waiver ID
- * Returns historical customer and minor data as it was when the waiver was signed
- */
-const getWaiverSnapshot = async (req, res) => {
-  try {
-    const { waiverId } = req.query;
-
-    // Validate waiverId parameter
-    if (!waiverId) {
-      return res.status(400).json({
-        error: "Waiver ID is required",
-      });
-    }
-
-    // Fetch waiver with snapshot data
-    const [waivers] = await db.query(
-      `SELECT 
-        id,
-        user_id,
-        signer_name,
-        signer_email,
-        signer_address,
-        signer_city,
-        signer_province,
-        signer_postal,
-        signer_dob,
-        minors_snapshot,
-        signed_at,
-        created_at,
-        rules_accepted,
-        completed
-      FROM waivers 
-      WHERE id = ? LIMIT 1`,
-      [waiverId]
-    );
-
-    if (waivers.length === 0) {
-      return res.status(404).json({
-        error: "Waiver not found",
-      });
-    }
-
-    const waiver = waivers[0];
-    
-    // Check if this is a pending waiver (no signature/snapshot yet)
-    const isPending = !waiver.signed_at;
-
-    // Get current user data for phone and other fields not in snapshot
-    const [users] = await db.query(
-      "SELECT * FROM users WHERE id = ?",
-      [waiver.user_id]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({
-        error: "User not found for this waiver",
-      });
-    }
-
-    const user = users[0];
-
-    // For pending waivers, use data from users table instead of snapshot
-    let first_name, last_name, customer, minors;
-    
-    if (isPending) {
-      // Pending waiver - use current user data
-      first_name = user.first_name;
-      last_name = user.last_name;
-      
-      customer = {
-        id: user.id,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        dob: user.dob,
-        address: user.address,
-        city: user.city,
-        province: user.province,
-        postal_code: user.postal_code,
-        country_code: user.country_code,
-        cell_phone: user.cell_phone,
-        home_phone: user.home_phone,
-        work_phone: user.work_phone,
-        can_email: user.can_email
-      };
-      
-      // Get active minors from minors table
-      const [minorsData] = await db.query(
-        "SELECT * FROM minors WHERE user_id = ? AND status = 1",
-        [user.id]
-      );
-      minors = minorsData;
-      
-    } else {
-      // Completed waiver - use snapshot data
-      const nameParts = waiver.signer_name ? waiver.signer_name.split(' ') : ['', ''];
-      first_name = nameParts[0] || '';
-      last_name = nameParts.slice(1).join(' ') || '';
-
-      // Build customer object from snapshot data
-      customer = {
-        id: waiver.user_id,
-        first_name,
-        last_name,
-        email: waiver.signer_email,
-        dob: waiver.signer_dob,
-        address: waiver.signer_address,
-        city: waiver.signer_city,
-        province: waiver.signer_province,
-        postal_code: waiver.signer_postal,
-        cell_phone: user.cell_phone,
-        country_code: user.country_code,
-        home_phone: user.home_phone,
-        work_phone: user.work_phone,
-        can_email: null,
-      };
-
-      // Parse minors from snapshot JSON
-      if (waiver.minors_snapshot) {
-        try {
-          const parsedMinors = JSON.parse(waiver.minors_snapshot);
-          minors = parsedMinors.map((m, index) => ({
-            id: `snapshot_${index}`, // Temporary ID for display purposes
-            first_name: m.first_name,
-            last_name: m.last_name,
-            dob: m.dob,
-            status: 1,
-            checked: true,
-            isSnapshot: true, // Flag to indicate this is historical data
-          }));
-        } catch (parseError) {
-          console.error(`Error parsing minors_snapshot for waiver ${waiverId}:`, parseError);
-          minors = [];
-        }
-      } else {
-        minors = [];
-      }
-    }
-
-    res.json({ 
-      customer, 
-      minors,
-      waiver: {
-        rules_accepted: waiver.rules_accepted,
-        completed: waiver.completed
-      }
-    });
-  } catch (error) {
-    const errorId = `ERR_${Date.now()}`;
-    console.error(`[${errorId}] Error fetching waiver snapshot:`, {
-      message: error.message,
-      waiverId: req.query.waiverId,
-    });
-
-    res.status(500).json({
-      error: "Failed to fetch waiver snapshot",
-      errorId,
-    });
-  }
-};
-
-/**
- * Updates customer information and associated minors
+ * Updates customer information only (minors managed in Redux and submitted with waiver)
  */
 const updateCustomer = async (req, res) => {
   try {
@@ -561,7 +291,6 @@ const updateCustomer = async (req, res) => {
       postal_code,
       cell_phone,
       can_email,
-      minors,
     } = req.body;
 
     // Validate required fields
@@ -610,37 +339,7 @@ const updateCustomer = async (req, res) => {
       ],
     );
 
-    // Update minors if provided
-    if (minors && minors.length > 0) {
-      for (const minor of minors) {
-        if (minor.isNew) {
-          await db.query(
-            "INSERT INTO minors (user_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, ?)",
-            [
-              id,
-              minor.first_name,
-              minor.last_name,
-              minor.dob,
-              minor.checked ? 1 : 0,
-            ],
-          );
-        } else {
-          await db.query(
-            "UPDATE minors SET first_name = ?, last_name = ?, dob = ?, status = ? WHERE id = ?",
-            [
-              minor.first_name,
-              minor.last_name,
-              minor.dob,
-              minor.checked ? 1 : 0,
-              minor.id,
-            ],
-          );
-        }
-      }
-    }
-
-    // Minors are already linked to customer via user_id, no junction table needed
-    console.log(`✅ Minors updated for customer ${id}`);
+    console.log(`✅ Customer ${id} updated successfully`);
 
     res.json({
       success: true,
@@ -661,19 +360,14 @@ const updateCustomer = async (req, res) => {
 };
 
 /**
- * Saves customer signature to waiver form and updates minors
+ * Saves customer signature to waiver form with minors snapshot
  */
 const saveSignature = async (req, res) => {
   try {
     const {
-      id,
-      phone,
-      signature,
-      fullName,
-      date,
-      minors,
-      subscribed,
-      consented,
+      id,    
+      signature,  
+      minors
     } = req.body;
 
     // Validate required fields
@@ -697,62 +391,7 @@ const saveSignature = async (req, res) => {
 
     const user = users[0];
 
-    // Handle minors: add, update, and remove
-    // Get existing minors from database
-    const [existingMinors] = await db.query(
-      "SELECT id FROM minors WHERE user_id = ?",
-      [id],
-    );
-    
-    const existingMinorIds = existingMinors.map(m => m.id);
-    const submittedMinorIds = [];
-
-    // Process submitted minors (add new or update existing)
-    if (minors && minors.length > 0) {
-      for (const minor of minors) {
-        if (minor.isNew) {
-          // Insert new minor - only if all required fields are present
-          if (minor.first_name && minor.last_name && minor.dob) {
-            await db.query(
-              "INSERT INTO minors (user_id, first_name, last_name, dob, status) VALUES (?, ?, ?, ?, ?)",
-              [
-                id,
-                minor.first_name,
-                minor.last_name,
-                minor.dob,
-                1, // Always set status to 1 (active) for new minors
-              ],
-            );
-            console.log(`✅ Added new minor ${minor.first_name} ${minor.last_name} for user ${id}`);
-          }
-        } else if (minor.id) {
-          // Update existing minor
-          submittedMinorIds.push(minor.id);
-          await db.query(
-            "UPDATE minors SET first_name = ?, last_name = ?, dob = ?, status = ? WHERE id = ?",
-            [
-              minor.first_name,
-              minor.last_name,
-              minor.dob,
-              minor.checked ? 1 : 0,
-              minor.id,
-            ],
-          );
-        }
-      }
-    }
-
-    // Delete minors that were removed (exist in DB but not in submitted list)
-    const minorsToDelete = existingMinorIds.filter(id => !submittedMinorIds.includes(id));
-    if (minorsToDelete.length > 0) {
-      await db.query(
-        "DELETE FROM minors WHERE id IN (?)",
-        [minorsToDelete],
-      );
-      console.log(`🗑️ Deleted ${minorsToDelete.length} minor(s) from user ${id}`);
-    }
-
-    // Build snapshot data using submitted minors that have all required fields
+    // Build snapshot data using submitted minors from Redux (already validated in frontend)
     // Filter out any incomplete minors before creating snapshot
     const checkedMinors = (minors || [])
       .filter(m => m.first_name && m.last_name && m.dob)
@@ -775,17 +414,16 @@ const saveSignature = async (req, res) => {
       minors_snapshot: JSON.stringify(checkedMinors)
     };
 
-    // Update the existing waiver (created during user registration) with signature and snapshot
     // Find the most recent unsigned waiver for this user
     const [existingWaivers] = await db.query(
-      "SELECT id FROM waivers WHERE user_id = ? AND signed_at IS NULL ORDER BY created_at DESC LIMIT 1",
+      "SELECT id, signed_at FROM waivers WHERE user_id = ? AND signed_at IS NULL ORDER BY created_at DESC LIMIT 1",
       [id],
     );
 
     let waiverId;
     
     if (existingWaivers.length > 0) {
-      // Update existing waiver with signature and snapshot data
+      // Update existing unsigned waiver with signature and snapshot data
       waiverId = existingWaivers[0].id;
       await db.query(
         `UPDATE waivers 
@@ -795,7 +433,7 @@ const saveSignature = async (req, res) => {
             signer_dob = ?, minors_snapshot = ?
         WHERE id = ?`,
         [
-          signature, 
+          signature,
           snapshotData.signer_name,
           snapshotData.signer_email,
           snapshotData.signer_address,
@@ -807,31 +445,45 @@ const saveSignature = async (req, res) => {
           waiverId
         ],
       );
-      console.log(`✅ Updated waiver ${waiverId} with signature and snapshot for user ${id}`);
+      console.log(`✅ Updated existing unsigned waiver ${waiverId} with signature and snapshot for user ${id}`);
     } else {
-      // Fallback: Create new waiver if none exists (shouldn't happen in normal flow)
-      const [result] = await db.query(
-        `INSERT INTO waivers 
-        (user_id, signature_image, signed_at, completed, 
-         signer_name, signer_email, signer_address, 
-         signer_city, signer_province, signer_postal, 
-         signer_dob, minors_snapshot) 
-        VALUES (?, ?, NOW(), 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id, 
-          signature,
-          snapshotData.signer_name,
-          snapshotData.signer_email,
-          snapshotData.signer_address,
-          snapshotData.signer_city,
-          snapshotData.signer_province,
-          snapshotData.signer_postal,
-          snapshotData.signer_dob,
-          snapshotData.minors_snapshot
-        ],
+      // No unsigned waiver found - check if user has any signed waivers (repeat visit)
+      const [signedWaivers] = await db.query(
+        "SELECT id FROM waivers WHERE user_id = ? AND signed_at IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+        [id],
       );
-      waiverId = result.insertId;
-      console.log(`✅ Created new waiver ${waiverId} with signature and snapshot for user ${id}`);
+
+      if (signedWaivers.length > 0) {
+        // User has a previous signed waiver - create new one for repeat visit
+        const [result] = await db.query(
+          `INSERT INTO waivers 
+          (user_id, signature_image, signed_at, completed, 
+           signer_name, signer_email, signer_address, 
+           signer_city, signer_province, signer_postal, 
+           signer_dob, minors_snapshot) 
+          VALUES (?, ?, NOW(), 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id, 
+            signature,
+            snapshotData.signer_name,
+            snapshotData.signer_email,
+            snapshotData.signer_address,
+            snapshotData.signer_city,
+            snapshotData.signer_province,
+            snapshotData.signer_postal,
+            snapshotData.signer_dob,
+            snapshotData.minors_snapshot
+          ],
+        );
+        waiverId = result.insertId;
+        console.log(`✅ Created new waiver ${waiverId} for repeat visit by user ${id}`);
+      } else {
+        // This should not happen in normal flow, but handle it
+        console.error(`⚠️ No waiver found for user ${id} - this should not happen`);
+        return res.status(500).json({
+          error: "No waiver found to sign. Please start the process again.",
+        });
+      }
     }
 
     console.log(`✅ Signature and snapshot saved for waiver ${waiverId}`);
@@ -852,6 +504,33 @@ const saveSignature = async (req, res) => {
       error: "Failed to save signature",
       errorId,
     });
+  }
+};
+
+/**
+ * Updates only the signed_at timestamp for an existing waiver
+ * Used when customer re-signs without any data modifications
+ */
+const updateWaiverTimestamp = async (req, res) => {
+  try {
+    const { waiverId } = req.body;
+    
+    if (!waiverId) {
+      return res.status(400).json({ error: "Waiver ID is required" });
+    }
+    
+    const now = new Date();
+    await db.query(
+      "UPDATE waivers SET signed_at = ? WHERE id = ?",
+      [now, waiverId]
+    );
+    
+    console.log(`✅ Updated timestamp for waiver ${waiverId}`);
+    
+    res.json({ success: true, message: "Waiver timestamp updated successfully" });
+  } catch (error) {
+    console.error("Error updating waiver timestamp:", error);
+    res.status(500).json({ error: "Failed to update waiver timestamp" });
   }
 };
 
@@ -905,61 +584,6 @@ const acceptRules = async (req, res) => {
 
     res.status(500).json({
       error: "Failed to accept rules",
-      errorId,
-    });
-  }
-};
-
-/**
- * Gets customer information and associated minors by phone number
- * Used by signature page to display customer data and minors
- */
-const getMinors = async (req, res) => {
-  try {
-    const { phone } = req.query;
-
-    // Validate phone parameter
-    if (!phone) {
-      return res.status(400).json({
-        error: "Phone number is required",
-      });
-    }
-
-    // Fetch complete customer data
-    const [customers] = await db.query(
-      "SELECT * FROM users WHERE cell_phone = ? ORDER BY created_at DESC LIMIT 1",
-      [phone],
-    );
-
-    if (customers.length === 0) {
-      return res.status(404).json({ 
-        error: "Customer not found",
-        minors: [] 
-      });
-    }
-
-    const customer = customers[0];
-
-    // Fetch associated active minors (only from current waiver)
-    const [minors] = await db.query(
-      "SELECT * FROM minors WHERE user_id = ? AND status = 1",
-      [customer.id],
-    );
-
-    // Return customer data with minors (matching what signature page expects)
-    res.json({ 
-      ...customer,
-      minors 
-    });
-  } catch (error) {
-    const errorId = `ERR_${Date.now()}`;
-    console.error(`[${errorId}] Error fetching customer and minors:`, {
-      message: error.message,
-      phone: req.query.phone,
-    });
-
-    res.status(500).json({
-      error: "Failed to fetch customer information",
       errorId,
     });
   }
@@ -1136,11 +760,21 @@ const getWaiverDetails = async (req, res) => {
 
     const user = users[0];
 
-    // Fetch current active minors (not from snapshot, but current state)
-    const [currentMinors] = await db.query(
-      `SELECT id, first_name, last_name, dob, status FROM minors WHERE user_id = ?`,
+    // Fetch current minors from latest waiver snapshot
+    const [latestWaiverMinors] = await db.query(
+      `SELECT minors_snapshot FROM waivers WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
       [id]
     );
+    
+    // Parse minors from snapshot
+    let currentMinors = [];
+    if (latestWaiverMinors.length > 0 && latestWaiverMinors[0].minors_snapshot) {
+      try {
+        currentMinors = JSON.parse(latestWaiverMinors[0].minors_snapshot);
+      } catch (parseError) {
+        console.error('Error parsing minors_snapshot:', parseError);
+      }
+    }
 
     // Get all waivers for this user with staff verification info
     const { convertToEST } = require("../utils/time");
@@ -1502,141 +1136,6 @@ const saveRating = async (req, res) => {
 };
 
 /**
- * Gets dashboard data for existing customer showing all their visits (waivers)
- * Returns waivers for the phone number, with customer and minor data from snapshots
- */
-const getCustomerDashboard = async (req, res) => {
-  try {
-    const { phone } = req.query;
-
-    // Validate phone parameter
-    if (!phone) {
-      return res.status(400).json({
-        error: "Phone number is required",
-      });
-    }
-
-    // Get all users with this phone number to find their waivers
-    const [users] = await db.query(
-      `SELECT id, status FROM users WHERE cell_phone = ?`,
-      [phone],
-    );
-
-    if (users.length === 0) {
-      return res.json({ 
-        message: "No customer records found for this phone number",
-        waivers: [],
-        isVerified: false
-      });
-    }
-
-    // Check if any user with this phone has verified via OTP
-    const hasVerifiedUser = users.some(u => u.status === 1);
-    const userIds = users.map(u => u.id);
-
-    // Import timezone utility
-    const { convertToEST } = require("../utils/time");
-
-    // Fetch all waivers for these users with snapshot data
-    const [waivers] = await db.query(
-      `SELECT 
-        w.id as waiver_id,
-        w.user_id,
-        w.signed_at,
-        w.signature_image,
-        w.rules_accepted,
-        w.completed,
-        w.verified_by_staff,
-        w.created_at,
-        w.signer_name,
-        w.signer_email,
-        w.signer_dob,
-        w.signer_address,
-        w.signer_city,
-        w.signer_province,
-        w.signer_postal,
-        w.minors_snapshot,
-        CASE 
-          WHEN w.verified_by_staff > 0 THEN s.name
-          ELSE NULL
-        END as verified_by_name
-      FROM waivers w
-      LEFT JOIN staff s ON w.verified_by_staff = s.id
-      WHERE w.user_id IN (?) ORDER BY w.created_at DESC`,
-      [userIds],
-    );
-
-    // If user hasn't verified OTP, show only the most recent waiver
-    let filteredWaivers = waivers;
-    if (!hasVerifiedUser && waivers.length > 0) {
-      filteredWaivers = [waivers[0]];
-      console.log(`⚠️ User has not verified OTP - showing only latest waiver for phone: ${phone}`);
-    } else {
-      console.log(`✅ User has verified OTP - showing all ${waivers.length} waivers for phone: ${phone}`);
-    }
-
-    // Parse each waiver's snapshot data
-    const waiversWithData = filteredWaivers.map(waiver => {
-      // Parse minors from snapshot
-      let minors = [];
-      if (waiver.minors_snapshot) {
-        try {
-          minors = JSON.parse(waiver.minors_snapshot);
-        } catch (parseError) {
-          console.error(`Error parsing minors_snapshot for waiver ${waiver.waiver_id}:`, parseError);
-        }
-      }
-
-      // Extract first_name and last_name from signer_name
-      const nameParts = waiver.signer_name ? waiver.signer_name.split(' ') : ['', ''];
-      const first_name = nameParts[0] || '';
-      const last_name = nameParts.slice(1).join(' ') || '';
-
-      return {
-        waiver_id: waiver.waiver_id,
-        user_id: waiver.user_id,
-        first_name,
-        last_name,
-        email: waiver.signer_email,
-        dob: waiver.signer_dob,
-        address: waiver.signer_address,
-        city: waiver.signer_city,
-        province: waiver.signer_province,
-        postal_code: waiver.signer_postal,
-        cell_phone: phone,
-        signed_at: waiver.signed_at ? convertToEST(waiver.signed_at, "MMM DD, YYYY [at] hh:mm A") : null,
-        signature_image: waiver.signature_image,
-        rules_accepted: waiver.rules_accepted,
-        completed: waiver.completed,
-        verified_by_staff: waiver.verified_by_staff,
-        verified_by_name: waiver.verified_by_name,
-        created_at: waiver.created_at,
-        minors: minors
-      };
-    });
-
-    res.json({
-      success: true,
-      phone: phone,
-      totalWaivers: filteredWaivers.length,
-      waivers: waiversWithData,
-      isVerified: hasVerifiedUser
-    });
-  } catch (error) {
-    const errorId = `ERR_${Date.now()}`;
-    console.error(`[${errorId}] Error fetching customer dashboard:`, {
-      message: error.message,
-      phone: req.query.phone,
-    });
-
-    res.status(500).json({
-      error: "Failed to fetch customer dashboard",
-      errorId,
-    });
-  }
-};
-
-/**
  * Fetches signature for a customer or specific waiver
  */
 const getSignature = async (req, res) => {
@@ -1688,15 +1187,117 @@ const getSignature = async (req, res) => {
   }
 };
 
+/**
+ * Gets the latest (most recent) waiver for a customer by phone number
+ * Returns complete waiver data with signer snapshot and minors for existing customers
+ */
+const getLatestWaiver = async (req, res) => {
+  try {
+    const { phone } = req.query;
+
+    if (!phone) {
+      return res.status(400).json({
+        error: "Phone number is required",
+      });
+    }
+
+    // Get user by phone
+    const [users] = await db.query(
+      `SELECT id, country_code FROM users WHERE cell_phone = ? LIMIT 1`,
+      [phone]
+    );
+
+    if (users.length === 0) {
+      return res.json({
+        message: "No customer found",
+        waiverId: null
+      });
+    }
+
+    const userId = users[0].id;
+    const countryCode = users[0].country_code || "+1";
+
+    // Get the most recent waiver with ALL signer snapshot fields, minors_snapshot, and signature
+    const [waivers] = await db.query(
+      `SELECT id, user_id, signed_at, created_at,
+              signer_name, signer_email, signer_address, signer_city, 
+              signer_province, signer_postal, signer_dob,
+              minors_snapshot, signature_image
+       FROM waivers 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (waivers.length === 0) {
+      return res.json({
+        message: "No waivers found",
+        waiverId: null
+      });
+    }
+
+    const waiver = waivers[0];
+
+    // Parse signer name into first_name and last_name
+    const nameParts = (waiver.signer_name || "").split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
+    // Parse minors_snapshot JSON
+    let minors = [];
+    if (waiver.minors_snapshot) {
+      try {
+        minors = JSON.parse(waiver.minors_snapshot);
+      } catch (e) {
+        console.warn("Failed to parse minors_snapshot:", e);
+        minors = [];
+      }
+    }
+
+    // Build customer data object from waiver signer snapshot
+    const customerData = {
+      id: waiver.user_id,
+      first_name: firstName,
+      last_name: lastName,
+      email: waiver.signer_email || "",
+      dob: waiver.signer_dob || "",
+      address: waiver.signer_address || "",
+      city: waiver.signer_city || "",
+      province: waiver.signer_province || "",
+      postal_code: waiver.signer_postal || "",
+      cell_phone: phone,
+      country_code: countryCode,
+    };
+
+    res.json({
+      waiverId: waiver.id,
+      signedAt: waiver.signed_at,
+      createdAt: waiver.created_at,
+      customer: customerData,
+      minors: minors,
+      signature: waiver.signature_image || null
+    });
+  } catch (error) {
+    const errorId = `ERR_${Date.now()}`;
+    console.error(`[${errorId}] Error fetching latest waiver:`, {
+      message: error.message,
+      phone: req.query.phone,
+    });
+
+    res.status(500).json({
+      error: "Failed to fetch latest waiver",
+      errorId,
+    });
+  }
+};
+
 module.exports = {
   createWaiver,
-  getCustomerInfo,
-  getCustomerInfoById,
-  getWaiverSnapshot,
   updateCustomer,
   saveSignature,
+  updateWaiverTimestamp,
   acceptRules,
-  getMinors,
   getAllCustomers,
   verifyWaiver,
   getWaiverDetails,
@@ -1706,6 +1307,6 @@ module.exports = {
   updateWaiverStatus,
   getRatingInfo,
   saveRating,
-  getCustomerDashboard,
   getSignature,
+  getLatestWaiver,
 };

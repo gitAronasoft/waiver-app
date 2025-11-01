@@ -6,7 +6,7 @@ import axios from "axios";
 import { toast } from 'react-toastify';
 import { BACKEND_URL } from '../config';
 import UserHeader from '../components/UserHeader';
-import { setCurrentStep, setSignatureImage as setSignatureImageRedux, setViewMode, setWaiverId } from "../store/slices/waiverSessionSlice";
+import { setCurrentStep, setWaiverId, setMinors } from "../store/slices/waiverSessionSlice";
 
 
 
@@ -20,9 +20,6 @@ function Signature() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [minorErrors, setMinorErrors] = useState({});
-  const [showSignatureConfirmDialog, setShowSignatureConfirmDialog] = useState(false);
-  const [originalSignature, setOriginalSignature] = useState(null);
-  const [userModifiedSignature, setUserModifiedSignature] = useState(false);
 
   const customerType = useSelector((state) => state.waiverSession.flowType) || "existing";
   const phone = useSelector((state) => state.waiverSession.phone);
@@ -31,11 +28,12 @@ function Signature() {
   const waiverId = useSelector((state) => state.waiverSession.waiverId);
   const viewMode = useSelector((state) => state.waiverSession.progress.viewMode) || false;
   const createNewWaiver = useSelector((state) => state.waiverSession.progress.createNewWaiver) || false;
-  const viewCompleted = useSelector((state) => state.waiverSession.progress.viewCompleted) || false;
+  const hasDataModifications = useSelector((state) => state.waiverSession.progress.hasDataModifications) || false;
   
-  // Get customer data and minors from Redux (saved by ConfirmCustomerInfo page)
+  // Get customer data, minors, and signature from Redux (saved by ConfirmCustomerInfo page and VerifyOtpPage)
   const reduxCustomerData = useSelector((state) => state.waiverSession.customerData);
   const reduxMinors = useSelector((state) => state.waiverSession.minors);
+  const reduxSignature = useSelector((state) => state.waiverSession.signature);
 
   // Route protection: Redirect if accessed directly without valid state
   useEffect(() => {
@@ -50,75 +48,54 @@ function Signature() {
     fullName: "",
     consented: customerType === "existing" || isReturning,
     subscribed: false,
-    minors: [],
   });
 
 
-  // Load customer data from Redux (data comes from ConfirmCustomerInfo page)
+  // Load customer data from Redux only (no API calls)
   useEffect(() => {
-    if (!phone || !reduxCustomerData) return;
+    // Check if Redux data exists, if not redirect to review information
+    if (!reduxCustomerData || !reduxCustomerData.id) {
+      console.warn("No customer data in Redux, redirecting to review-information");
+      toast.error("Please confirm your information first");
+      navigate("/review-information", { replace: true });
+      return;
+    }
 
-    const loadCustomerData = async () => {
-      setLoading(true);
-      try {
-        // Use Redux data instead of fetching from API
-        const data = reduxCustomerData;
-        setCustomerData(data);
-        setForm((prev) => ({
-          ...prev,
-          date: new Date().toISOString().split("T")[0],
-          fullName: `${data.first_name} ${data.last_name}`,
-          minors: (reduxMinors || []).map((m) => ({
-            id: m.id,
-            first_name: m.first_name,
-            last_name: m.last_name,
-            dob: m.dob ? new Date(m.dob).toISOString().split("T")[0] : "",
-            checked: m.checked !== undefined ? m.checked : (m.status === 1),
-            isNew: m.isNew || false,
-          })),
-        }));
+    // Use Redux data directly
+    const data = reduxCustomerData;
+    setCustomerData(data);
+    setForm((prev) => ({
+      ...prev,
+      date: new Date().toISOString().split("T")[0],
+      fullName: `${data.first_name} ${data.last_name}`,
+    }));
 
-        // Only pre-fill signature when viewing a specific waiver OR when NOT creating a new waiver
-        // For new waiver flow (createNewWaiver=true), don't pre-fill signature
-        const shouldPreFillSignature = waiverId || (viewMode && !createNewWaiver);
-        
-        if (shouldPreFillSignature && (waiverId || customerId)) {
+    // Only pre-fill signature for existing customers viewing/updating their waiver
+    // Skip for new customers - they don't have a signature yet
+    const isNewCustomer = customerType === "new";
+    const shouldPreFillSignature = !isNewCustomer && (waiverId || (viewMode && !createNewWaiver));
+    
+    if (shouldPreFillSignature && reduxSignature) {
+      // Use signature from Redux (loaded by VerifyOtpPage after OTP verification)
+      console.log("✅ Loading signature from Redux (no API call needed)");
+      setTimeout(() => {
+        if (sigPadRef.current) {
           try {
-            const signatureResponse = waiverId
-              ? await axios.get(`${BACKEND_URL}/api/waivers/get-signature?waiverId=${waiverId}`)
-              : await axios.get(`${BACKEND_URL}/api/waivers/get-signature?customerId=${customerId}`);
-            
-            if (signatureResponse.data?.signature) {
-              const signatureData = signatureResponse.data.signature;
-              setOriginalSignature(signatureData); // Store original for comparison
-              
-              // Pre-fill the signature pad
-              setTimeout(() => {
-                if (sigPadRef.current) {
-                  try {
-                    sigPadRef.current.fromDataURL(signatureData);
-                    setUserModifiedSignature(false); // Reset flag when loading existing signature
-                  } catch (error) {
-                    console.error("Failed to pre-fill signature:", error);
-                  }
-                }
-              }, 100);
-            }
+            sigPadRef.current.fromDataURL(reduxSignature);
+            console.log("✅ Signature pre-filled from Redux");
           } catch (error) {
-            console.log("No previous signature found or error fetching:", error);
-            // Not a critical error, user can still sign manually
+            console.error("Failed to pre-fill signature from Redux:", error);
           }
         }
-      } catch (error) {
-        console.error("Failed to load customer data:", error);
-        toast.error("We couldn't load your information. Please go back and try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadCustomerData();
-  }, [phone, reduxCustomerData, reduxMinors, isReturning, customerId, waiverId, viewMode, createNewWaiver]);
+      }, 100);
+    } else if (isNewCustomer) {
+      console.log("New customer flow - skipping signature fetch");
+    } else if (shouldPreFillSignature && !reduxSignature) {
+      console.log("No signature found in Redux for existing customer");
+    }
+    
+    setLoading(false);
+  }, [reduxCustomerData, reduxMinors, reduxSignature, navigate, waiverId, customerId, viewMode, createNewWaiver, customerType]);
 
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
@@ -130,10 +107,9 @@ function Signature() {
   };
 
   const handleMinorChange = (index, field, value) => {
-    const minors = [...form.minors];
-    minors[index][field] = value;
-    const updated = { ...form, minors };
-    setForm(updated);
+    const minors = [...reduxMinors];
+    minors[index] = { ...minors[index], [field]: value };
+    dispatch(setMinors(minors));
     
     // Clear error for this field when user types
     const errorKey = `${index}_${field}`;
@@ -145,21 +121,20 @@ function Signature() {
   };
 
   const handleAddMinor = () => {
-    const updated = {
-      ...form,
-      minors: [
-        ...form.minors,
-        { first_name: "", last_name: "", dob: "", checked: false, isNew: true },
-      ],
+    const newMinor = { 
+      first_name: "", 
+      last_name: "", 
+      dob: "", 
+      checked: true, 
+      isNew: true 
     };
-    setForm(updated);
+    dispatch(setMinors([...reduxMinors, newMinor]));
   };
 
   const handleRemoveMinor = (index) => {
-    const minors = [...form.minors];
+    const minors = [...reduxMinors];
     minors.splice(index, 1);
-    const updated = { ...form, minors };
-    setForm(updated);
+    dispatch(setMinors(minors));
     
     // Clear errors for removed minor and rebuild error keys for remaining minors
     const newErrors = {};
@@ -181,39 +156,6 @@ function Signature() {
 
   const handleClearSignature = () => {
     sigPadRef.current.clear();
-    setUserModifiedSignature(true); // Mark as modified when user clears
-  };
-
-  // Function to proceed with signature submission after confirmation
-  const proceedWithSignature = async () => {
-    setShowSignatureConfirmDialog(false);
-    
-    // User confirmed they want to create a new waiver with the new signature
-    // Set flags to indicate we're creating a new waiver
-    dispatch(setViewMode(false)); // Switch to create mode
-    dispatch(setWaiverId(null)); // Clear waiverId to create new waiver
-    
-    // Prevent multiple submissions
-    if (submitting) return;
-    setSubmitting(true);
-
-    // Proceed with submission to create new waiver
-    await submitSignature();
-  };
-
-  // Function to cancel signature change and restore original signature
-  const cancelSignatureChange = () => {
-    setShowSignatureConfirmDialog(false);
-    
-    // Restore original signature
-    if (originalSignature && sigPadRef.current) {
-      try {
-        sigPadRef.current.fromDataURL(originalSignature);
-        setUserModifiedSignature(false); // Reset flag when restoring original
-      } catch (error) {
-        console.error("Failed to restore original signature:", error);
-      }
-    }
   };
 
   // Extracted submission logic
@@ -233,11 +175,12 @@ function Signature() {
       return;
     }
 
-    // Validate all minors and collect errors
+    // Only validate and include checked minors
+    const checkedMinors = (reduxMinors || []).filter(m => m.checked);
     const validationErrors = {};
     let hasErrors = false;
     
-    form.minors.forEach((minor, index) => {
+    checkedMinors.forEach((minor, index) => {
       // Check if minor has any data entered
       const hasData = minor.first_name?.trim() || minor.last_name?.trim() || minor.dob;
       
@@ -284,14 +227,90 @@ function Signature() {
       return;
     }
 
-    // Only include minors with all required fields filled
-    const cleanedMinors = form.minors.filter(m => 
+    // Only include checked minors with all required fields filled
+    const cleanedMinors = checkedMinors.filter(m => 
       m.first_name?.trim() && m.last_name?.trim() && m.dob
     );
 
-    // Update form with cleaned minors
-    const updatedForm = { ...form, minors: cleanedMinors };
-    setForm(updatedForm);
+    // Update Redux with cleaned minors
+    dispatch(setMinors(cleanedMinors));
+
+    // Update customer data in database if modifications detected (add/remove minors)
+    if (hasDataModifications) {
+      console.log("🔄 Database update - modifications detected, updating customer data");
+      try {
+        const stripMask = (val) => (val ? val.replace(/\D/g, "") : "");
+        const updatePayload = {
+          ...customerData,
+          cell_phone: stripMask(customerData.cell_phone),
+          home_phone: stripMask(customerData.home_phone),
+          work_phone: stripMask(customerData.work_phone),
+          minors: cleanedMinors.map((minor) => ({
+            id: minor.id,
+            first_name: minor.first_name,
+            last_name: minor.last_name,
+            dob: minor.dob,
+            isNew: minor.isNew,
+            checked: minor.checked,
+          })),
+        };
+
+        await axios.post(`${BACKEND_URL}/api/waivers/update-customer`, updatePayload);
+        console.log("✅ Customer data updated in database");
+      } catch (error) {
+        console.error("Failed to update customer data:", error);
+        toast.error("Failed to update your information. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    // Smart waiver logic: Only create new waiver if there are data modifications
+    if (hasDataModifications && waiverId && customerType === 'existing') {
+      console.log("🔄 Data modifications detected - creating new unsigned waiver before signature submission");
+      try {
+        const stripMask = (val) => (val ? val.replace(/\D/g, "") : "");
+        const createWaiverPayload = {
+          ...customerData,
+          cell_phone: stripMask(customerData.cell_phone),
+          home_phone: stripMask(customerData.home_phone),
+          work_phone: stripMask(customerData.work_phone),
+          minors: cleanedMinors.map(m => ({
+            first_name: m.first_name,
+            last_name: m.last_name,
+            dob: m.dob,
+          })),
+          send_otp: false,
+        };
+        
+        await axios.post(`${BACKEND_URL}/api/waivers`, createWaiverPayload);
+        
+        // Clear waiverId so save-signature creates/updates the new waiver
+        dispatch(setWaiverId(null));
+        console.log("✅ Created new waiver due to modifications");
+      } catch (error) {
+        console.error("Failed to create new waiver:", error);
+        toast.error("Failed to create new waiver. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+    } else if (!hasDataModifications && waiverId && customerType === 'existing') {
+      console.log("📝 No data modifications - updating existing waiver timestamp only");
+      try {
+        await axios.put(`${BACKEND_URL}/api/waivers/update-timestamp`, { waiverId });
+        console.log("✅ Updated waiver timestamp successfully");
+        
+        toast.success("Thank you! Your waiver has been updated successfully.");
+        dispatch(setCurrentStep('RULE_REMINDER'));
+        navigate("/rules", { replace: true });
+        return;
+      } catch (error) {
+        console.error("Failed to update waiver timestamp:", error);
+        toast.error("Failed to update waiver. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+    }
 
     try {
       // Add white background before exporting
@@ -312,16 +331,14 @@ function Signature() {
       // Restore original composition operation
       ctx.globalCompositeOperation = currentCompositeOperation;
 
-      dispatch(setSignatureImageRedux(signatureData));
-
       const payload = {
         id: customerData?.id || customerId,
         phone,
-        date: updatedForm.date,
-        fullName: updatedForm.fullName,
+        date: form.date,
+        fullName: form.fullName,
         minors: cleanedMinors,
-        subscribed: updatedForm.subscribed,
-        consented: updatedForm.consented,
+        subscribed: form.subscribed,
+        consented: form.consented,
         signature: signatureData,
       };
 
@@ -356,23 +373,6 @@ function Signature() {
   };
 
   const handleSubmit = async () => {
-    // Check if this is an existing user viewing a completed waiver
-    // A completed waiver has originalSignature (loaded from snapshot)
-    const isViewingCompletedWaiver = originalSignature !== null;
-    const signatureHasChanged = isViewingCompletedWaiver && userModifiedSignature;
-    
-    // Show confirmation dialog if user is modifying a completed waiver's signature
-    if (isViewingCompletedWaiver && signatureHasChanged && !createNewWaiver) {
-      setShowSignatureConfirmDialog(true);
-      return;
-    }
-
-    // If in view mode without changes (and not creating new waiver), redirect to My Waivers
-    if ((viewMode || viewCompleted) && !createNewWaiver && !signatureHasChanged) {
-      navigate("/my-waivers", { replace: true });
-      return;
-    }
-
     // Prevent multiple submissions immediately
     if (submitting) return;
     setSubmitting(true);
@@ -409,9 +409,9 @@ function formatPhone(phone = "") {
     
     // Always navigate back to the previous step in the flow
     if (customerType === "new") {
-      navigate("/verify-otp", { replace: true });
+      navigate("/verify-phone", { replace: true });
     } else {
-      navigate("/confirm-info", { replace: true });
+      navigate("/review-information", { replace: true });
     }
   };
 
@@ -546,8 +546,8 @@ CONTENTS AND VOLUNTARILY AGREE TO ITS TERMS  </p>
 SIGNING THIS WAIVER I AM WAIVING CERTIAN LEGAL RIGHTS WHICH I OR MY HEIRS, NEXT OF KIN, EXECUTORS, 
 AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
 
-            {/* Minor fields at top */}
-            {form.minors.filter(minor => isReturning ? minor.checked : true).map((minor, index) => (
+            {/* Minor fields at top - only show checked minors */}
+            {(reduxMinors || []).filter(minor => minor.checked).map((minor, index) => (
               <div key={index} className="my-3 no-print">
                 <div className="row g-2 align-items-start">
                   <div className="col-12 col-md-3">
@@ -629,35 +629,26 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
                       >
                         Remove
                       </button>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {!isReturning && (
-              <div className="my-3 no-print">
-                <div className="row g-2 align-items-start">
-                  <div className="col-12 col-md-9"></div>
-                  <div className="col-12 col-md-3">
-                    <button 
-                      className="btn btn-primary w-100" 
+                    ) : <button
+                      type="button"
+                      className="btn btn-primary no-print"
                       onClick={handleAddMinor}
                       style={{
                         backgroundColor: '#007bff',
                         border: 'none',
                         borderRadius: '8px',
-                        padding: '10px 15px',
-                        fontSize: '14px',
-                        fontWeight: '500'
+                        padding: '10px 40px',
+                        fontSize: '15px',
+                        fontWeight: '500',
+                        minWidth: '200px',
                       }}
                     >
                       Add another minor
-                    </button>
+                    </button>}
                   </div>
                 </div>
               </div>
-            )}
+            ))}
 
             <div className="confirm-box mt-4 mb-4 no-print">
               <label className="d-flex align-items-start gap-2">
@@ -697,7 +688,6 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
               }}>
                 <SignaturePad
                   ref={sigPadRef}
-                  onBegin={() => setUserModifiedSignature(true)}
                   canvasProps={{ 
                     width: 600, 
                     height: 200, 
@@ -727,9 +717,7 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
                 >
                   {submitting 
                     ? "Processing..." 
-                    : (viewCompleted || viewMode) && !createNewWaiver
-                      ? "Return to My Waivers"
-                      : "Accept and continue"}
+                    : "Accept and continue"}
                 </button>
               </div>
             </div>
@@ -737,86 +725,6 @@ AND ADMINISTRATORS MAY HAVE AGAINST SKATE & PLAY INC. </p>
         </div>
       </div>
     </div>
-
-    {/* Signature Change Confirmation Dialog */}
-    {showSignatureConfirmDialog && (
-      <div 
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999
-        }}
-        onClick={() => setShowSignatureConfirmDialog(false)}
-      >
-        <div 
-          style={{
-            background: 'white',
-            borderRadius: '12px',
-            padding: '30px',
-            maxWidth: '500px',
-            width: '90%',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <h4 style={{ 
-            color: '#6C5CE7', 
-            marginBottom: '15px',
-            fontSize: '1.3rem',
-            fontWeight: '600'
-          }}>
-            ⚠️ Signature Change Detected
-          </h4>
-          <p style={{ 
-            color: '#4a5568', 
-            marginBottom: '20px',
-            lineHeight: '1.6'
-          }}>
-            You have changed your signature from your previous waiver. 
-            <strong> By continuing, you will create a new waiver</strong> with this new signature.
-            <br /><br />
-            The original waiver will remain unchanged for record-keeping purposes.
-          </p>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button
-              onClick={cancelSignatureChange}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                color: '#4a5568',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={proceedWithSignature}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#6C5CE7',
-                color: 'white',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Yes, Create New Waiver
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
     </>
   );
 }

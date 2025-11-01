@@ -4,7 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { toast } from 'react-toastify';
 import { BACKEND_URL } from '../config';
-import { setCurrentStep, setCustomerId } from "../store/slices/waiverSessionSlice";
+import { setCurrentStep, setCustomerId, setWaiverId, setViewMode, setCustomerData, setMinors, setSignature } from "../store/slices/waiverSessionSlice";
+import LazyImage from "../components/LazyImage";
 
 function VerifyOtp() {
   const [otp, setOtp] = useState("");
@@ -66,18 +67,53 @@ const verifyOtp = async (otpValue) => {
     if (res.data.authenticated) {
       toast.success("Phone number verified successfully!");
       
-      // Set customerId in Redux for existing customers to fix Rules page redirect
+      // Set customerId in Redux
       if (res.data.userId) {
         dispatch(setCustomerId(res.data.userId));
         console.log("Set customerId in Redux:", res.data.userId);
       }
 
       if (flowType === "existing") {
-        dispatch(setCurrentStep('DASHBOARD'));
-        navigate("/my-waivers", { replace: true });
+        // Fetch latest waiver with complete customer data and minors from waiver snapshot
+        try {
+          const latestWaiverRes = await axios.get(`${BACKEND_URL}/api/waivers/latest-waiver?phone=${phone}`);
+          
+          if (latestWaiverRes.data.waiverId) {
+            dispatch(setWaiverId(latestWaiverRes.data.waiverId));
+            dispatch(setViewMode(true));
+            console.log("✅ Loaded latest waiver:", latestWaiverRes.data.waiverId);
+            
+            // Store complete customer data from waiver signer snapshot
+            if (latestWaiverRes.data.customer) {
+              dispatch(setCustomerData(latestWaiverRes.data.customer));
+              console.log("✅ Stored customer data from waiver snapshot in Redux");
+            }
+            
+            // Store minors from waiver minors_snapshot
+            if (latestWaiverRes.data.minors) {
+              dispatch(setMinors(latestWaiverRes.data.minors));
+              console.log("✅ Stored minors from waiver snapshot in Redux");
+            }
+            
+            // Store signature from latest waiver
+            if (latestWaiverRes.data.signature) {
+              dispatch(setSignature(latestWaiverRes.data.signature));
+              console.log("✅ Stored signature from latest waiver in Redux");
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching latest waiver:", error);
+          toast.error("Unable to load your waiver information. Please try again.");
+          setLoading(false);
+          return;
+        }
+        dispatch(setCurrentStep('CONFIRM_INFO'));
+        navigate("/review-information", { replace: true });
       } else if (flowType === "new") {
+        // New customers already have data in Redux from NewCustomerForm
+        // No need to fetch - just navigate to signature page
         dispatch(setCurrentStep('SIGNATURE'));
-        navigate("/signature", { replace: true });
+        navigate("/sign-waiver", { replace: true });
       }
     } else {
       toast.error("The code you entered is incorrect. Please try again.");
@@ -100,7 +136,7 @@ const verifyOtp = async (otpValue) => {
         <div className="row">
           <div className="col-md-2">
             <div className="back-btn">
-              <Link to="/existing-customer">
+              <Link to="/login">
                 <img
                   className="img-fluid"
                   src="/assets/img/image 298.png"
@@ -114,7 +150,7 @@ const verifyOtp = async (otpValue) => {
           <div className="col-12 col-md-8 col-xl-8">
             <div className="step-two step-three">
               <div className="logo mb-3">
-                <img
+                <LazyImage
                   className="img-fluid"
                   src="/assets/img/logo.png"
                   alt="logo"

@@ -46,10 +46,14 @@ const AdminFeedbackPage = () => {
       const lowerSearch = search.toLowerCase();
       const filtered = feedbackList.filter(f => {
         const fullName = `${f.first_name || ""} ${f.last_name || ""}`.toLowerCase();
+        const email = (f.email || "").toLowerCase();
+        const phone = (f.cell_phone || "").toLowerCase();
         const staffName = (f.staff_name || "").toLowerCase();
         const message = (f.message || "").toLowerCase();
         const issue = (f.issue || "").toLowerCase();
         return fullName.includes(lowerSearch) || 
+               email.includes(lowerSearch) ||
+               phone.includes(lowerSearch) ||
                staffName.includes(lowerSearch) || 
                message.includes(lowerSearch) ||
                issue.includes(lowerSearch);
@@ -69,6 +73,21 @@ const AdminFeedbackPage = () => {
           {row.first_name || ""} {row.last_name || ""}
         </span>
       )
+    },
+    {
+      name: "Email",
+      selector: row => row.email || "-",
+      sortable: true,
+      cell: row => <span title={row.email || "-"}>{row.email || "-"}</span>,
+      wrap: true,
+      minWidth: "180px"
+    },
+    {
+      name: "Phone",
+      selector: row => row.cell_phone || "-",
+      sortable: true,
+      cell: row => <span title={row.cell_phone || "-"}>{row.cell_phone || "-"}</span>,
+      width: "130px"
     },
     {
       name: "Waiver ID",
@@ -134,6 +153,12 @@ const AdminFeedbackPage = () => {
   const ExpandedComponent = ({ data }) => (
     <div style={{ padding: "10px 20px" }}>
       <div>
+        <strong>Email:</strong> {data.email || "-"}
+      </div>
+      <div style={{ marginTop: "10px" }}>
+        <strong>Phone:</strong> {data.cell_phone || "-"}
+      </div>
+      <div style={{ marginTop: "10px" }}>
         <strong>Waiver ID:</strong> {data.waiver_id || "-"}
       </div>
       <div style={{ marginTop: "10px" }}>

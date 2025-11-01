@@ -7,6 +7,7 @@ import { useMask } from "@react-input/mask";
 import { countryCodes } from "../countryCodes";
 import { BACKEND_URL } from '../config';
 import { setPhone as setReduxPhone, setCurrentStep, setViewMode, setFlowType } from "../store/slices/waiverSessionSlice";
+import LazyImage from "../components/LazyImage";
 
 function ExistingCustomerLogin() {
   const [phone, setPhone] = useState("");
@@ -100,30 +101,34 @@ function ExistingCustomerLogin() {
 
   const sendOtp = async () => {
     if (loading) return;
-    
+
     const cleanPhone = phone.replace(/\D/g, "");
-    
+
     if (cleanPhone.length === 0) {
       toast.error("Please enter your phone number to continue.");
       return;
     }
-    
+
     if (cleanPhone.length < 10) {
       toast.error(`Phone number must be exactly 10 digits. You entered ${cleanPhone.length} digit${cleanPhone.length !== 1 ? 's' : ''}.`);
       return;
     }
-    
+
     setLoading(true);
     try {
       const fullPhone = `${countryCode}${cleanPhone}`;   
       const res = await axios.post(`${BACKEND_URL}/api/auth/send-otp`, { cell_phone: fullPhone, phone: cleanPhone });
       toast.success(res.data.message);
-      
+
+      console.log("✅ OTP sent successfully");
+
+      // Store phone and flow type in Redux
+      // Customer data and waiver will be fetched after OTP verification in VerifyOtpPage
       dispatch(setReduxPhone(cleanPhone));
       dispatch(setFlowType('existing'));
       dispatch(setViewMode(false));
       dispatch(setCurrentStep('OTP_VERIFICATION'));
-      navigate("/otp-verified");
+      navigate("/verify-phone");
     } catch (err) {
       toast.error(err?.response?.data?.message || "We couldn't send the verification code. Please check your phone number and try again.");
     } finally {
@@ -136,7 +141,7 @@ function ExistingCustomerLogin() {
       <div className="container text-center">
         <div className="row">
           <div className="col-md-2">
-            <div className="back-btn" style={{ 'margin-top': '50px'}}>
+            <div className="back-btn" style={{ 'marginTop': '50px'}}>
               <Link to="/">
                 <img
                   className="img-fluid"
@@ -150,7 +155,7 @@ function ExistingCustomerLogin() {
           <div className="col-12 col-md-8 col-xl-8">
             <div className="step-two step-three">
               <div className="logo">
-                <img
+                <LazyImage
                   className="img-fluid"
                   src="/assets/img/logo.png"
                   alt="logo"

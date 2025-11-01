@@ -13,8 +13,10 @@ import {
   setCustomerData, 
   setMinors,
   setCurrentStep,
-  setViewMode 
+  setViewMode,
+  setFlowType
 } from "../store/slices/waiverSessionSlice";
+import LazyImage from "../components/LazyImage";
 
 function NewCustomerForm() {
   const navigate = useNavigate();
@@ -222,21 +224,29 @@ function NewCustomerForm() {
       ...formData,
       cell_phone: cleanPhone,
       cc_cell_phone: phoneWithCode,
-      minors: minorList,
+      minors: minorList.map(m => ({ ...m, checked: true })),
       send_otp: isChecked,
     };
 
     try {
       const response = await axios.post(`${BACKEND_URL}/api/waivers`, fullData);
-      const { waiverId, userId } = response.data;
       
+      // Ensure response has the required data
+      if (!response.data || !response.data.userId || !response.data.waiverId) {
+        throw new Error("Invalid response from server");
+      }
+      
+      const { waiverId, userId } = response.data;
       const phoneNumber = stripMask(formData.cell_phone);
       
+      // Store all data in Redux
       dispatch(setPhone(phoneNumber));
       dispatch(setCustomerId(userId));
       dispatch(setWaiverId(waiverId));
       dispatch(setViewMode(false));
+      dispatch(setFlowType('new'));
       dispatch(setCustomerData({
+        id: userId,
         first_name: formData.first_name,
         last_name: formData.last_name,
         email: formData.email,
@@ -246,23 +256,26 @@ function NewCustomerForm() {
         province: formData.province,
         postal_code: formData.postal_code,
         cell_phone: phoneNumber,
+        country_code: formData.country_code,
       }));
       dispatch(setMinors(minorList.map(m => ({ ...m, status: 1, checked: true }))));
+      
+      console.log("✅ Waiver created:", { waiverId, userId, phone: phoneNumber });
       
       if (isChecked) {
         dispatch(setCurrentStep('OTP_VERIFICATION'));
         toast.success("Your information has been saved. Please check your phone for the verification code.");
-        navigate("/otp-verified");
+        navigate("/verify-phone", { replace: true });
       } else {
         dispatch(setCurrentStep('SIGNATURE'));
         toast.success("Your information has been saved successfully.");
-        navigate("/signature");
+        navigate("/sign-waiver", { replace: true });
       }
     } catch (err) {
+      console.error("Error creating waiver:", err);
       if (err.response && err.response.data?.error) {
         toast.error(`${err.response.data.error}`);
       } else {
-        console.error(err);
         toast.error("We couldn't submit your information. Please check the form and try again.");
       }
     } finally {
@@ -289,7 +302,7 @@ function NewCustomerForm() {
           <div className="col-12 col-md-8 col-xl-8">
             <div className="step-two step-three">
               <div className="logo">
-                <img
+                <LazyImage
                   className="img-fluid"
                   src="/assets/img/logo.png"
                   alt="logo"
