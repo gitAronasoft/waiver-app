@@ -1,18 +1,22 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "../../utils/axios";
 import Header from "./components/header";
 import { convertToEST } from "../../utils/time";
 import DataTable from 'react-data-table-component';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
+import { toast } from "react-toastify";
 import { BACKEND_URL } from '../../config';
 
 const AdminFeedbackPage = () => {
-  const [feedbackList, setFeedbackList] = useState([]);
-  const [filtered, setFiltered] = useState([]);
+  const [data, setData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [totalRows, setTotalRows] = useState(0);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -20,47 +24,59 @@ const AdminFeedbackPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await axios.get(
-          `${BACKEND_URL}/api/feedback/list`
-        );
-        const sorted = data.sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
-        setFeedbackList(sorted);
-        setFiltered(sorted);
-      } catch (err) {
+  // Fetch feedback with server-side pagination
+  const fetchFeedback = (page = 1, limit = 20, searchQuery = "") => {
+    setLoading(true);
+    
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(searchQuery && { search: searchQuery })
+    });
+
+    axios.get(`${BACKEND_URL}/api/feedback/list?${params}`)
+      .then(res => {
+        setData(res.data.data || res.data);
+        setTotalRows(res.data.pagination?.total || res.data.length || 0);
+      })
+      .catch(err => {
         console.error("Failed to fetch feedback", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
+        toast.error("Failed to load feedback.");
+      })
+      .finally(() => setLoading(false));
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchFeedback(currentPage, rowsPerPage, search);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Refetch when search changes
   useEffect(() => {
-    if (search.trim() === "") {
-      setFiltered(feedbackList);
-    } else {
-      const lowerSearch = search.toLowerCase();
-      const filtered = feedbackList.filter(f => {
-        const fullName = `${f.first_name || ""} ${f.last_name || ""}`.toLowerCase();
-        const email = (f.email || "").toLowerCase();
-        const phone = (f.cell_phone || "").toLowerCase();
-        const staffName = (f.staff_name || "").toLowerCase();
-        const message = (f.message || "").toLowerCase();
-        const issue = (f.issue || "").toLowerCase();
-        return fullName.includes(lowerSearch) || 
-               email.includes(lowerSearch) ||
-               phone.includes(lowerSearch) ||
-               staffName.includes(lowerSearch) || 
-               message.includes(lowerSearch) ||
-               issue.includes(lowerSearch);
-      });
-      setFiltered(filtered);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
     }
-  }, [search, feedbackList]);
+    setCurrentPage(1);
+    fetchFeedback(1, rowsPerPage, search);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    if (page === currentPage) return;
+    setCurrentPage(page);
+    fetchFeedback(page, rowsPerPage, search);
+  };
+
+  // Handle rows per page change
+  const handlePerRowsChange = (newPerPage, page) => {
+    if (newPerPage === rowsPerPage) return;
+    setRowsPerPage(newPerPage);
+    setCurrentPage(page);
+    fetchFeedback(page, newPerPage, search);
+  };
 
   const desktopColumns = [
     { name: "#", cell: (row, index) => index + 1, width: "60px", sortable: true },
@@ -209,8 +225,14 @@ const AdminFeedbackPage = () => {
               <div className="history-table">
                 <DataTable
                   columns={isMobile ? mobileColumns : desktopColumns}
-                  data={filtered}
+                  data={data}
                   pagination
+                  paginationServer
+                  paginationTotalRows={totalRows}
+                  paginationDefaultPage={currentPage}
+                  paginationPerPage={rowsPerPage}
+                  onChangePage={handlePageChange}
+                  onChangeRowsPerPage={handlePerRowsChange}
                   responsive
                   highlightOnHover
                   noHeader
