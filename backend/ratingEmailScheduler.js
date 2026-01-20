@@ -91,37 +91,37 @@ cron.schedule("0 * * * *", async () => {
       }
 
       // 📲 SMS SENDING
-      // if (!waiver.rating_sms_sent) {
-      //   try {
-      //     if (waiver.cell_phone && waiver.cell_phone.trim() !== "") {
-      //       await sendRatingSMS(waiver);
-      //       await db.query(
-      //         `UPDATE waivers SET rating_sms_sent = 1 WHERE id = ?`,
-      //         [waiver.waiver_id]
-      //       );
-      //       console.log(
-      //         `📲 SMS sent to ${waiver.cell_phone} (waiver ID ${waiver.waiver_id})`
-      //       );
-      //     } else {
-      //       await db.query(
-      //         `UPDATE waivers SET rating_sms_sent = 2 WHERE id = ?`,
-      //         [waiver.waiver_id]
-      //       );
-      //       console.warn(
-      //         `⚠️ No valid phone for waiver ID ${waiver.waiver_id}, marked as failed.`
-      //       );
-      //     }
-      //   } catch (err) {
-      //     console.error(
-      //       `❌ SMS failed for waiver ID ${waiver.waiver_id}:`,
-      //       err.message
-      //     );
-      //     await db.query(
-      //       `UPDATE waivers SET rating_sms_sent = 2 WHERE id = ?`,
-      //       [waiver.waiver_id]
-      //     );
-      //   }
-      // }
+      /*if (!waiver.rating_sms_sent) {
+        try {
+          if (waiver.cell_phone && waiver.cell_phone.trim() !== "") {
+            await sendRatingSMS(waiver);
+            await db.query(
+              `UPDATE waivers SET rating_sms_sent = 1 WHERE id = ?`,
+              [waiver.waiver_id]
+            );
+            console.log(
+              `📲 SMS sent to ${waiver.cell_phone} (waiver ID ${waiver.waiver_id})`
+            );
+          } else {
+            await db.query(
+              `UPDATE waivers SET rating_sms_sent = 2 WHERE id = ?`,
+              [waiver.waiver_id]
+            );
+            console.warn(
+              `⚠️ No valid phone for waiver ID ${waiver.waiver_id}, marked as failed.`
+            );
+          }
+        } catch (err) {
+          console.error(
+            `❌ SMS failed for waiver ID ${waiver.waiver_id}:`,
+            err.message
+          );
+          await db.query(
+            `UPDATE waivers SET rating_sms_sent = 2 WHERE id = ?`,
+            [waiver.waiver_id]
+          );
+        }
+      }*/
     }
   } catch (err) {
     console.error("🚨 Rating scheduler query failed:", err);
